@@ -238,6 +238,28 @@ once a menu has at least one item) rather than being independently
 controlled — see the three `classList.toggle("hidden", ...)` sites in
 `bookings-ui.js` for exactly what each pair is gated on.
 
+Each "Share via WhatsApp" button has a `src/assets/whatsapp-icon.png`
+`<img>` inside it (sized via `.whatsapp-icon` — `height: 1.1em` so it
+scales with whichever button class it's in, `.btn` vs `.btn-sm`). Source:
+`design-assets/whatsapp-logo-source.jpeg` — despite the `.jpeg`
+extension it had a checkerboard "transparency preview" pattern baked
+directly into its pixels (two near-white/near-gray shades, ~237 and
+~255), not real alpha (`sharp` confirmed `hasAlpha: false`); chroma-keyed
+both shades to transparent (green icon pixels have `g` far above `r`/`b`
+so they never match) and trimmed, same general technique as the venue
+logo processing (see "White-label multi-venue support" above).
+
+**Real bug this surfaced**: the "Preparing…"/restore button-state pattern
+(shared by all three PDF generators) captured and restored via
+`btn.textContent`, which silently strips any non-text children —
+harmless for the plain-text download buttons, but would have permanently
+deleted the new icon out of a share button's markup the very first time
+it was used (`textContent` getter ignores `<img>` entirely, so the
+"restore" step replaced the button's contents with just the label text,
+icon gone for good). Fixed by capturing/restoring via `innerHTML`
+instead — verified with a real generate-then-restore cycle confirming the
+icon's `<img>` survives byte-for-byte.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

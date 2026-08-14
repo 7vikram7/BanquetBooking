@@ -1014,7 +1014,12 @@ async function outputPdf(doc, filename, mode) {
 
 async function generateMenuPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("menu-download-pdf-btn");
-  const originalLabel = btn.textContent;
+  // innerHTML, not textContent: some of these buttons (the "Share via
+  // WhatsApp" ones) contain an <img> icon alongside their label — textContent
+  // would silently and permanently strip it the first time this runs, since
+  // restoring via textContent afterward replaces all children with a single
+  // text node, icon included.
+  const originalLabel = btn.innerHTML;
   btn.disabled = true;
   btn.textContent = "Preparing PDF…";
 
@@ -1068,7 +1073,7 @@ async function generateMenuPdf(ev, mode = "download") {
     alert("Could not generate the PDF — check your connection and try again.");
   } finally {
     btn.disabled = false;
-    btn.textContent = originalLabel;
+    btn.innerHTML = originalLabel;
   }
 }
 
@@ -1089,7 +1094,7 @@ function formatMoneyForPdf(n) {
 // (that's generateEventSummaryPdf(), only relevant once settled).
 async function generateBookingConfirmationPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("bk-confirmation-btn");
-  const originalLabel = btn.textContent;
+  const originalLabel = btn.innerHTML; // see generateMenuPdf() for why innerHTML, not textContent
   btn.disabled = true;
   btn.textContent = "Preparing…";
 
@@ -1201,7 +1206,7 @@ async function generateBookingConfirmationPdf(ev, mode = "download") {
     alert("Could not generate the confirmation — check your connection and try again.");
   } finally {
     btn.disabled = false;
-    btn.textContent = originalLabel;
+    btn.innerHTML = originalLabel;
   }
 }
 
@@ -1214,7 +1219,7 @@ async function generateBookingConfirmationPdf(ev, mode = "download") {
 // document (generateMenuPdf() above); this one is the financial recap.
 async function generateEventSummaryPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("bk-event-summary-btn");
-  const originalLabel = btn.textContent;
+  const originalLabel = btn.innerHTML; // see generateMenuPdf() for why innerHTML, not textContent
   btn.disabled = true;
   btn.textContent = "Preparing…";
 
@@ -1331,6 +1336,6 @@ async function generateEventSummaryPdf(ev, mode = "download") {
     alert("Could not generate the summary — check your connection and try again.");
   } finally {
     btn.disabled = false;
-    btn.textContent = originalLabel;
+    btn.innerHTML = originalLabel;
   }
 }
