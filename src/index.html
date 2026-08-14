@@ -208,7 +208,12 @@
       </select></label>
       <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="enq-event-type"></select></label>
       <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="enq-customer" /></label>
-      <label><span class="label-text">Phone<span class="required-star">*</span></span> <input type="text" id="enq-phone" /></label>
+      <label><span class="label-text">Phone<span class="required-star">*</span></span>
+        <div class="field-with-action">
+          <input type="text" id="enq-phone" />
+          <button type="button" class="btn-icon-action" id="enq-call-btn" title="Call this number">Call</button>
+        </div>
+      </label>
       <label>Email <input type="email" id="enq-email" /></label>
       <label><span class="label-text">Guest count<span class="required-star">*</span></span> <input type="number" id="enq-guests" min="0" /></label>
       <label>Status <select id="enq-status">
@@ -245,7 +250,12 @@
       </select></label>
       <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="bk-event-type"></select></label>
       <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="bk-customer" /></label>
-      <label><span class="label-text">Phone<span class="required-star">*</span></span> <input type="text" id="bk-phone" /></label>
+      <label><span class="label-text">Phone<span class="required-star">*</span></span>
+        <div class="field-with-action">
+          <input type="text" id="bk-phone" />
+          <button type="button" class="btn-icon-action" id="bk-call-btn" title="Call this number">Call</button>
+        </div>
+      </label>
       <label>Email <input type="email" id="bk-email" /></label>
       <label><span class="label-text">Guest count<span class="required-star">*</span></span> <input type="number" id="bk-guests" min="0" /></label>
       <label>Status <select id="bk-status">
@@ -278,7 +288,10 @@
     </div>
     <p class="balance-line">Total advance received: <strong id="bk-advance-display">₹0</strong></p>
     <p class="balance-line">Balance due: <strong id="bk-balance-display">₹0</strong></p>
-    <button class="btn btn-sm hidden" id="bk-confirmation-btn" type="button">View Booking Confirmation</button>
+    <div class="modal-actions">
+      <button class="btn btn-sm hidden" id="bk-confirmation-btn" type="button">View Booking Confirmation</button>
+      <button class="btn btn-sm hidden" id="bk-confirmation-share-btn" type="button">Share via WhatsApp</button>
+    </div>
 
     <h3>Menu</h3>
     <div class="form-grid">
@@ -292,6 +305,7 @@
     <div class="modal-actions">
       <button class="btn btn-sm" id="bk-edit-menu-btn" type="button">Edit Menu</button>
       <button class="btn btn-sm hidden" id="bk-download-menu-btn" type="button">Download Menu PDF</button>
+      <button class="btn btn-sm hidden" id="bk-share-menu-btn" type="button">Share via WhatsApp</button>
     </div>
 
     <h3>Final Settlement</h3>
@@ -323,7 +337,10 @@
     </div>
 
     <div class="modal-error" id="bk-error"></div>
-    <button class="btn btn-sm hidden" id="bk-event-summary-btn" type="button">View Event Summary</button>
+    <div class="modal-actions">
+      <button class="btn btn-sm hidden" id="bk-event-summary-btn" type="button">View Event Summary</button>
+      <button class="btn btn-sm hidden" id="bk-event-summary-share-btn" type="button">Share via WhatsApp</button>
+    </div>
     <div class="modal-actions">
       <button class="btn btn-primary" id="bk-save-btn">Save</button>
       <button class="btn btn-danger hidden" id="bk-delete-btn">Delete</button>
@@ -342,6 +359,7 @@
     <div class="modal-actions">
       <button class="btn btn-primary" id="menu-done-btn" type="button">Done</button>
       <button class="btn btn-secondary" id="menu-download-pdf-btn" type="button">Download PDF</button>
+      <button class="btn btn-secondary" id="menu-share-pdf-btn" type="button">Share via WhatsApp</button>
     </div>
   </div>
 </div>

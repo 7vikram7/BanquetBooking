@@ -80,6 +80,24 @@ label {
 }
 .required-star { color: var(--danger); margin-left: 0.15rem; }
 
+/* Phone input + its "Call" button, side by side within the same label
+   (label itself is flex-column, so this inner row is what keeps input
+   and button horizontal without breaking that stacking). */
+.field-with-action { display: flex; gap: 0.4rem; align-items: center; }
+.field-with-action input { flex: 1; min-width: 0; }
+.btn-icon-action {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.btn-icon-action:hover { background: var(--secondary); }
+
 input, select, textarea {
   font-family: inherit;
   /* 16px minimum: iOS Safari auto-zooms the page on focus for any input

@@ -361,6 +361,23 @@ function populateSelect(selectEl, options, { includeBlank, blankLabel } = {}) {
   }
 }
 
+// Wires a "Call" button beside a phone <input> — reads the input's CURRENT
+// value at click time (not whatever it was when the modal opened), so it
+// stays correct if the number is edited before saving. tel: only accepts
+// digits and a leading "+" reliably across phone OSes, so anything else
+// typed in (spaces, dashes, brackets) is stripped rather than passed
+// through as-is. Used by both the enquiry and booking modals — the only
+// two places a phone number is entered in this app.
+function wireCallButton(inputId, buttonId) {
+  const btn = document.getElementById(buttonId);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const raw = document.getElementById(inputId).value.trim();
+    if (!raw) return;
+    window.location.href = "tel:" + raw.replace(/[^\d+]/g, "");
+  });
+}
+
 // Shared required-field check for enquiry/booking forms (date, hall, slot,
 // event type, customer name, phone, guest count are all marked required in
 // the UI — hall/slot/event type are <select>s with no blank option, so they

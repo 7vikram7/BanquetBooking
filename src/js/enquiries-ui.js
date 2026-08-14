@@ -11,6 +11,7 @@ function initEnquiryModal() {
   document.getElementById("enq-save-btn").addEventListener("click", saveEnquiry);
   document.getElementById("enq-delete-btn").addEventListener("click", deleteEnquiryHandler);
   document.getElementById("enq-convert-btn").addEventListener("click", convertEnquiryHandler);
+  wireCallButton("enq-phone", "enq-call-btn");
 }
 
 let editingEnquiry = null;

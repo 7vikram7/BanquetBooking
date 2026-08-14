@@ -31,13 +31,16 @@ See [Onboarding a new venue](#onboarding-a-new-venue) to add one.
   bookings, open enquiries, and a date-range sales/occupancy summary
   broken down by hall + slot and facility-wide.
 - **Enquiries** — track leads before they're confirmed: status (new /
-  follow-up / lost), follow-up date, prefills straight into a booking.
+  follow-up / lost), follow-up date, prefills straight into a booking. A
+  "Call" button beside the phone field opens the phone's dialer directly.
 - **Bookings** — guest count, computed pricing (per-plate cost x guests +
   hall rent + extra amount), a menu builder (12 fixed categories) with
   PDF export for the kitchen, advance payments with running balance,
   and a two-step **Final Settlement** flow (bill → confirm → collect,
   with an optional 5% GST) that locks the event from further staff edits
   once settled. A separate Event Summary PDF covers the financial recap.
+  Every downloadable PDF has a matching "Share via WhatsApp" button
+  (mobile browsers only — hands the PDF to the OS share sheet).
 - **Accounts** (owner only) — a read-only sales ledger of past, settled
   events with a summary strip and per-event payment breakdown; supports
   Excel export.

@@ -198,6 +198,46 @@ exits early once it fits) for the same robustness reason — a single
 linear correction is exact only when nothing wraps (e.g. long notes text
 re-wrapping at a different scale is not perfectly linear).
 
+## Click-to-call and WhatsApp sharing
+
+**Click-to-call**: `wireCallButton(inputId, buttonId)` (`core.js`) is the
+only place phone numbers get a "Call" button — the two `<input>`s where a
+phone number is actually entered (`enq-phone` in the enquiry modal,
+`bk-phone` in the booking modal; phone is never otherwise displayed
+anywhere else in the app, e.g. not in any list/summary view). Reads the
+input's value at click time (not whatever it was when the modal opened,
+so it stays correct through edits) and navigates to `tel:<digits>` —
+non-digit/non-`+` characters are stripped since `tel:` handling isn't
+reliably tolerant of spaces/dashes/brackets across phone OSes.
+
+**WhatsApp sharing** of a generated PDF is fundamentally a file-sharing
+problem, not a linking problem: `https://wa.me/` links can only prefill
+TEXT into a WhatsApp chat, never attach a file — there's no URL scheme
+that hands WhatsApp an arbitrary blob from a web page. The only way to do
+this from a browser is the **Web Share API's file support**
+(`navigator.canShare({files:[...]})`/`navigator.share({files:[...]})`),
+which hands off to the OS's native share sheet (where WhatsApp shows up
+as one of the options) — supported on mobile Chrome/Safari, generally
+NOT supported on desktop browsers.
+
+All three PDF generators (`generateMenuPdf`, `generateBookingConfirmationPdf`,
+`generateEventSummaryPdf`) now take a `mode` parameter (`"download"`,
+the default and unchanged existing behavior, or `"share"`), and the final
+`doc.save(filename)` call in each was replaced with a shared
+`outputPdf(doc, filename, mode)` helper: `"download"` still just calls
+`doc.save()`; `"share"` builds a `File` from `doc.output("blob")` and
+tries `navigator.share()`, falling back to a plain download plus an alert
+telling the user to attach it manually when file-sharing isn't supported
+(most desktop browsers today) or the user cancels the native share sheet
+(`AbortError` — not treated as a failure). Every existing "Download ___
+PDF"/"View ___" button got a matching "Share via WhatsApp" button beside
+it, wired to the same generator function with `mode: "share"`, and
+mirroring the same `hidden`-class visibility toggles as its download
+counterpart (e.g. both only show once a booking is actually confirmed, or
+once a menu has at least one item) rather than being independently
+controlled — see the three `classList.toggle("hidden", ...)` sites in
+`bookings-ui.js` for exactly what each pair is gated on.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

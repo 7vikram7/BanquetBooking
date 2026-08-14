@@ -12,6 +12,7 @@ function initBookingModal() {
   document.getElementById("bk-save-btn").addEventListener("click", saveBooking);
   document.getElementById("bk-delete-btn").addEventListener("click", deleteBookingHandler);
   document.getElementById("bk-add-payment-btn").addEventListener("click", addPaymentToDraft);
+  wireCallButton("bk-phone", "bk-call-btn");
 
   // Total amount is computed (per-plate cost x guest count + hall rent +
   // extra charges), not typed in directly — recompute on any input that
@@ -22,6 +23,7 @@ function initBookingModal() {
 
   document.getElementById("bk-edit-menu-btn").addEventListener("click", openMenuModal);
   document.getElementById("bk-download-menu-btn").addEventListener("click", generateMenuPdf);
+  document.getElementById("bk-share-menu-btn").addEventListener("click", (ev) => generateMenuPdf(ev, "share"));
   // "Done" saves the booking outright (menu included) so the user never
   // has to separately click Save in the booking modal afterward — it
   // closes the menu editor first so any validation error from saveBooking()
@@ -32,6 +34,7 @@ function initBookingModal() {
     await saveBooking();
   });
   document.getElementById("menu-download-pdf-btn").addEventListener("click", generateMenuPdf);
+  document.getElementById("menu-share-pdf-btn").addEventListener("click", (ev) => generateMenuPdf(ev, "share"));
 
   // Deliberately no live-recompute on input here (unlike the pre-event
   // pricing fields above) — the final bill only appears once "Confirm" is
@@ -39,7 +42,9 @@ function initBookingModal() {
   document.getElementById("bk-settlement-calc-btn").addEventListener("click", calculateSettlementHandler);
   document.getElementById("bk-settlement-confirm-btn").addEventListener("click", confirmSettlementHandler);
   document.getElementById("bk-event-summary-btn").addEventListener("click", generateEventSummaryPdf);
+  document.getElementById("bk-event-summary-share-btn").addEventListener("click", (ev) => generateEventSummaryPdf(ev, "share"));
   document.getElementById("bk-confirmation-btn").addEventListener("click", generateBookingConfirmationPdf);
+  document.getElementById("bk-confirmation-share-btn").addEventListener("click", (ev) => generateBookingConfirmationPdf(ev, "share"));
 }
 
 let editingBookingId = null;
@@ -214,10 +219,9 @@ function openBookingModal(booking, prefill) {
   // A downloadable confirmation slip for the customer — available once the
   // booking has actually been saved as confirmed (not for a brand-new,
   // still-unsaved draft, and not once it's cancelled).
-  document.getElementById("bk-confirmation-btn").classList.toggle(
-    "hidden",
-    !(isEdit && booking?.status === "confirmed")
-  );
+  const confirmationAvailable = isEdit && booking?.status === "confirmed";
+  document.getElementById("bk-confirmation-btn").classList.toggle("hidden", !confirmationAvailable);
+  document.getElementById("bk-confirmation-share-btn").classList.toggle("hidden", !confirmationAvailable);
 
   openModal("modal-booking");
 }
@@ -451,6 +455,7 @@ function updateSettlementSummary() {
   // Viewing/sending the summary is a read-only action — available to
   // anyone once settled, not gated by the owner-only edit lock.
   document.getElementById("bk-event-summary-btn").classList.toggle("hidden", !settled);
+  document.getElementById("bk-event-summary-share-btn").classList.toggle("hidden", !settled);
   if (!settled) {
     summaryEl.textContent = settlementTooEarly()
       ? `Settlement can be recorded on or after the event day (${formatDateHuman(document.getElementById("bk-date").value)}).`
@@ -592,10 +597,9 @@ async function saveBooking() {
   editingBookingId = savedBooking.id;
   document.getElementById("bk-id").value = savedBooking.id;
   document.getElementById("bk-orig-date").value = savedBooking.date;
-  document.getElementById("bk-confirmation-btn").classList.toggle(
-    "hidden",
-    savedBooking.status !== "confirmed"
-  );
+  const stillConfirmed = savedBooking.status === "confirmed";
+  document.getElementById("bk-confirmation-btn").classList.toggle("hidden", !stillConfirmed);
+  document.getElementById("bk-confirmation-share-btn").classList.toggle("hidden", !stillConfirmed);
   await refreshCurrentTab();
 }
 
@@ -636,6 +640,7 @@ function updateMenuSummary() {
   // Quick PDF access without opening the full menu editor — only useful
   // once there's actually a menu to view/download.
   document.getElementById("bk-download-menu-btn").classList.toggle("hidden", totalItems === 0);
+  document.getElementById("bk-share-menu-btn").classList.toggle("hidden", totalItems === 0);
 }
 
 // All 12 categories are listed at once, each with its own input — clicking
@@ -980,7 +985,34 @@ function layoutMenuBody(doc, { draw, scale, margin, pageWidth, pageHeight, start
   return { finalY: y, heightUsed: y - startY, overflowed };
 }
 
-async function generateMenuPdf(ev) {
+// Shared "what happens to a finished PDF" step for all three PDF types —
+// either the normal browser download (doc.save()), or handed to the OS
+// share sheet via the Web Share API's file support so the user can pick
+// WhatsApp (or anything else) from it. There's no way to attach an
+// arbitrary file to a WhatsApp message from a plain web page without that
+// OS-level share support — wa.me links only prefill TEXT, never a file —
+// so browsers without it (most desktop browsers today) fall back to a
+// plain download plus a nudge to attach it manually.
+async function outputPdf(doc, filename, mode) {
+  if (mode !== "share") {
+    doc.save(filename);
+    return;
+  }
+  const file = new File([doc.output("blob")], filename, { type: "application/pdf" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError") return; // user cancelled the share sheet — not a failure
+      console.warn("[share] navigator.share failed, falling back to download", err);
+    }
+  }
+  doc.save(filename);
+  alert("Your browser can't share files directly here. The PDF has been downloaded instead — attach it to WhatsApp manually.");
+}
+
+async function generateMenuPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("menu-download-pdf-btn");
   const originalLabel = btn.textContent;
   btn.disabled = true;
@@ -1030,7 +1062,7 @@ async function generateMenuPdf(ev) {
     layoutMenuBody(doc, { draw: true, scale, ...layoutArgs });
 
     const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
-    doc.save(`Menu - ${filenameSafe} - ${dateVal || "undated"}.pdf`);
+    await outputPdf(doc, `Menu - ${filenameSafe} - ${dateVal || "undated"}.pdf`, mode);
   } catch (err) {
     console.error("[menu-pdf] failed to generate PDF", err);
     alert("Could not generate the PDF — check your connection and try again.");
@@ -1055,7 +1087,7 @@ function formatMoneyForPdf(n) {
 // on screen even before the next Save. Deliberately excludes settlement
 // figures — this is the "you're booked" document, not the closing bill
 // (that's generateEventSummaryPdf(), only relevant once settled).
-async function generateBookingConfirmationPdf(ev) {
+async function generateBookingConfirmationPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("bk-confirmation-btn");
   const originalLabel = btn.textContent;
   btn.disabled = true;
@@ -1163,7 +1195,7 @@ async function generateBookingConfirmationPdf(ev) {
     }
 
     const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
-    doc.save(`Booking Confirmation - ${filenameSafe} - ${dateVal || "undated"}.pdf`);
+    await outputPdf(doc, `Booking Confirmation - ${filenameSafe} - ${dateVal || "undated"}.pdf`, mode);
   } catch (err) {
     console.error("[booking-confirmation-pdf] failed to generate PDF", err);
     alert("Could not generate the confirmation — check your connection and try again.");
@@ -1180,7 +1212,7 @@ async function generateBookingConfirmationPdf(ev) {
 // so this deliberately doesn't handle an "unsettled" state. Menu content
 // stays out of this one on purpose — it's a separate, kitchen-facing
 // document (generateMenuPdf() above); this one is the financial recap.
-async function generateEventSummaryPdf(ev) {
+async function generateEventSummaryPdf(ev, mode = "download") {
   const btn = ev?.currentTarget || document.getElementById("bk-event-summary-btn");
   const originalLabel = btn.textContent;
   btn.disabled = true;
@@ -1293,7 +1325,7 @@ async function generateEventSummaryPdf(ev) {
     }
 
     const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
-    doc.save(`Event Summary - ${filenameSafe} - ${dateVal || "undated"}.pdf`);
+    await outputPdf(doc, `Event Summary - ${filenameSafe} - ${dateVal || "undated"}.pdf`, mode);
   } catch (err) {
     console.error("[event-summary-pdf] failed to generate PDF", err);
     alert("Could not generate the summary — check your connection and try again.");
