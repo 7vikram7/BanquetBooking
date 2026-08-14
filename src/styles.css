@@ -1,0 +1,545 @@
+:root {
+  /* Brand palette — colors sampled directly from the Shree Krishna Palace
+     logo file (src/assets/logo.png): teal-green #186860, gold #f8c880.
+     --gold is used sparingly for chrome/accents only, never for anything
+     that also needs to read as the "tentative" status color (amber) — the
+     two must stay visually distinct since one is decorative and the
+     other is functional. */
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --border: #e2e0d8;
+  --text: #1f2420;
+  --text-muted: #6b7268;
+  --primary: #186860;
+  --primary-hover: #124e48;
+  --gold: #f8c880;
+  --gold-soft: #fbe2b8;
+  --danger: #b3402a;
+  --danger-hover: #922f1c;
+  --secondary: #eceae2;
+  --secondary-hover: #ded9cb;
+
+  --available: #3fa34d;
+  --enquiry: #2f7fbf;
+  --tentative: #d99a1f;
+  --confirmed: #c0392b;
+  --settled: #e8590c;
+
+  --radius: 8px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1, h2, h3 { margin: 0.4em 0; }
+h1 { font-size: 1.3rem; }
+h2 { font-size: 1.05rem; margin-top: 1.4rem; }
+h3 { font-size: 0.95rem; margin-top: 1rem; }
+
+.hidden { display: none !important; }
+.muted { color: var(--text-muted); font-size: 0.9rem; }
+
+/* ---------------- buttons & forms ---------------- */
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.btn:hover { background: var(--secondary); }
+.btn-sm { padding: 0.3rem 0.6rem; font-size: 0.82rem; }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-secondary { background: var(--secondary); }
+.btn-secondary:hover { background: var(--secondary-hover); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.6rem;
+}
+.required-star { color: var(--danger); margin-left: 0.15rem; }
+
+input, select, textarea {
+  font-family: inherit;
+  /* 16px minimum: iOS Safari auto-zooms the page on focus for any input
+     with a smaller computed font-size — this is the fix, not a style choice. */
+  font-size: 16px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* Hide the native increment/decrement spinner on number inputs — all
+   numbers here (amounts, guest counts, costs) are typed in directly, the
+   step buttons just get in the way and are easy to bump by accident. */
+input[type="number"] { -moz-appearance: textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inline-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+
+/* ---------------- login ---------------- */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 28, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.login-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border-top: 3px solid var(--gold);
+  padding: 2rem;
+  width: 100%;
+  max-width: 360px;
+}
+.login-subtitle { text-align: center; margin: 0 0 1.2rem; font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.login-logo { display: block; max-height: 130px; width: auto; max-width: 100%; margin: 0 auto 0.4rem; }
+
+/* ---------------- app shell ---------------- */
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.2rem;
+  background: var(--surface);
+  border-bottom: 2px solid var(--gold-soft);
+}
+.brand { display: flex; align-items: center; gap: 0.6rem; }
+.header-logo { height: 34px; width: auto; }
+.header-right { display: flex; align-items: center; gap: 0.7rem; }
+.role-badge {
+  font-size: 0.78rem;
+  background: var(--secondary);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+}
+
+.sync-status {
+  background: #fff3cd;
+  color: #7a5c00;
+  padding: 0.4rem 1.2rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #f0dca0;
+}
+
+.tab-nav {
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.6rem 1.2rem 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.tab-btn {
+  border: none;
+  background: none;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+.tab-content { padding: 1.2rem; max-width: 1100px; margin: 0 auto; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ---------------- filter row ---------------- */
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.filter-row select, .filter-row input { padding: 0.4rem 0.5rem; }
+.month-label { font-weight: 600; min-width: 10rem; text-align: center; }
+
+/* ---------------- calendar ---------------- */
+
+.calendar-legend {
+  display: flex;
+  gap: 1.2rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 0.8rem;
+}
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.35rem; }
+.dot-available { background: var(--available); }
+.dot-enquiry { background: var(--enquiry); }
+.dot-tentative { background: var(--tentative); }
+.dot-confirmed { background: var(--confirmed); }
+.dot-settled { background: var(--settled); }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.cal-dow {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding-bottom: 0.3rem;
+}
+.cal-day {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  min-height: 92px;
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+.cal-day.cal-empty { background: transparent; border: none; }
+.cal-day.cal-today { border-color: var(--primary); border-width: 2px; }
+.cal-day-num { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.1rem; }
+.cal-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.cal-slot-cell {
+  border-radius: 4px;
+  font-size: 0.62rem;
+  padding: 3px 2px;
+  text-align: center;
+  cursor: pointer;
+  color: #fff;
+  line-height: 1.15;
+}
+.cal-slot-cell.status-available { background: var(--available); color: #fff; }
+.cal-slot-cell.status-enquiry { background: var(--enquiry); }
+.cal-slot-cell.status-tentative { background: var(--tentative); }
+.cal-slot-cell.status-confirmed { background: var(--confirmed); }
+.cal-slot-cell.status-settled { background: var(--settled); }
+.cal-slot-cell:hover { filter: brightness(0.92); }
+
+.status-pill {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  color: #fff;
+}
+.status-pill.status-new,
+.status-pill.status-followup,
+.status-pill.status-enquiry { background: var(--enquiry); }
+.status-pill.status-tentative { background: var(--tentative); }
+.status-pill.status-confirmed { background: var(--confirmed); }
+.status-pill.status-settled { background: var(--settled); }
+.status-pill.status-converted,
+.status-pill.status-available { background: var(--available); }
+.status-pill.status-lost,
+.status-pill.status-cancelled { background: var(--text-muted); }
+
+/* ---------------- modals ---------------- */
+
+.modal-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.6rem;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+.modal-box-sm { max-width: 360px; }
+.modal-close {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.9rem;
+  border: none;
+  background: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  line-height: 1;
+}
+.modal-actions { display: flex; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+.modal-error {
+  display: none;
+  color: var(--danger);
+  font-size: 0.82rem;
+  margin: 0.4rem 0;
+}
+.modal-error.show { display: block; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+}
+@media (max-width: 480px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* ---------------- dashboard ---------------- */
+
+.slot-card-row { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-bottom: 1rem; }
+.slot-card {
+  flex: 1 1 200px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 5px solid var(--available);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+}
+.slot-card.status-enquiry { border-left-color: var(--enquiry); }
+.slot-card.status-tentative { border-left-color: var(--tentative); }
+.slot-card.status-confirmed { border-left-color: var(--confirmed); }
+.slot-card.status-settled { border-left-color: var(--settled); }
+.slot-card h4 { margin: 0 0 0.3rem; font-size: 0.88rem; }
+.slot-card p { margin: 0.1rem 0; font-size: 0.82rem; color: var(--text-muted); }
+
+.simple-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.simple-list-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.86rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+}
+.simple-list-item:hover { background: #fafbfc; }
+.simple-list-empty { color: var(--text-muted); font-size: 0.85rem; padding: 0.4rem 0; }
+
+/* ---------------- settings ---------------- */
+
+.settings-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.8rem;
+  max-width: 420px;
+}
+.hall-name-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
+.hall-name-row label { flex-direction: row; align-items: center; min-width: 4.5rem; }
+
+/* ---------------- payments ---------------- */
+
+.payment-add-row { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); align-items: end; }
+.payment-confirm-row { display: flex; gap: 0.6rem; align-items: flex-end; margin-top: 0.6rem; }
+.payment-confirm-row label { flex: 1; margin-bottom: 0; }
+.payment-confirm-row .btn { flex: 0 0 auto; }
+.balance-line { font-size: 0.95rem; margin-top: 0.6rem; }
+.settlement-recorded-line { color: #1b7a3d; font-weight: 600; }
+
+/* ---------------- accounts (owner-only sales ledger) ---------------- */
+
+.acct-summary { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-bottom: 1.2rem; }
+.acct-summary-item {
+  flex: 1 1 130px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.acct-summary-item span { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.acct-summary-item strong { font-size: 1.05rem; }
+.acct-summary-item .dash-summary-sub { text-transform: none; letter-spacing: normal; font-size: 0.8rem; color: var(--text-muted); }
+.acct-summary-item.dash-summary-total { background: var(--secondary); border-color: var(--primary); }
+
+.acct-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+.acct-row-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+  font-size: 0.86rem;
+}
+.acct-row-summary:hover { background: #fafbfc; }
+.acct-row-summary-open { background: var(--secondary); }
+.acct-row-money { color: var(--text-muted); font-size: 0.82rem; white-space: nowrap; }
+.acct-outstanding { color: var(--tentative); }
+
+.acct-row-detail {
+  border-top: 1px solid var(--border);
+  padding: 0.7rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+.acct-payment-row {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.84rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed var(--border);
+}
+.acct-payment-row:last-of-type { border-bottom: none; }
+.acct-row-detail .simple-list-empty { width: 100%; }
+.acct-payment-by { color: var(--text-muted); white-space: nowrap; }
+.acct-detail-subheading { width: 100%; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted); margin-top: 0.3rem; }
+
+/* ---------------- menu editor ---------------- */
+/* Flat list of all 12 categories at once, each with its own inline add
+   row — replaced an earlier tab-per-category design that was too many
+   clicks to enter a full menu. */
+
+.menu-category-block {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.menu-category-block:last-child { border-bottom: none; }
+.menu-category-header { font-weight: 600; font-size: 0.88rem; margin-bottom: 0.4rem; }
+
+.menu-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.menu-category-chips:empty { margin-bottom: 0; }
+.menu-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--secondary);
+  border-radius: 999px;
+  padding: 0.3rem 0.4rem 0.3rem 0.7rem;
+  font-size: 0.82rem;
+}
+.menu-chip button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.1rem 0.3rem;
+}
+.menu-chip button:hover { color: var(--danger); }
+
+.menu-category-add-row { display: flex; gap: 0.5rem; }
+.menu-category-add-row input { flex: 1; }
+.menu-category-add-row .btn { flex: 0 0 auto; min-width: 2.6rem; }
+
+/* =======================================================================
+   Mobile (phone) layout — most staff use this app on phones, so this is
+   not a cosmetic afterthought. The calendar stays a real 7-column month
+   grid (not an agenda list) — each day cell shrinks to fit, and its 4
+   hall/slot indicators become small color-only dots (no room to keep the
+   "1·L" labels legible at this size). Tapping a day opens a day-detail
+   sheet listing all 4 slots at readable size — that's the primary way
+   in; a precise tap directly on a dot still jumps straight to that
+   slot's detail via stopPropagation in calendar-ui.js. Every tap target
+   also grows to a comfortable thumb size.
+   ======================================================================= */
+
+@media (max-width: 700px) {
+  .app-header { padding: 0.6rem 0.9rem; }
+  .app-header h1 { font-size: 1.05rem; }
+  .header-logo { height: 26px; }
+  .tab-content { padding: 0.8rem; }
+  .tab-nav { padding: 0.4rem 0.6rem 0; }
+  .tab-btn { padding: 0.7rem 0.8rem; font-size: 0.86rem; }
+
+  .btn { padding: 0.6rem 1rem; min-height: 2.6rem; }
+  .btn-sm { padding: 0.5rem 0.8rem; min-height: 2.2rem; }
+  input, select, textarea { min-height: 2.6rem; }
+
+  /* Calendar's Prev/Next/Today nav is the only .filter-row left — keep
+     it one compact line rather than stacking each button full-width. */
+  .filter-row { gap: 0.5rem; flex-wrap: nowrap; }
+  .filter-row .btn { flex: 0 0 auto; }
+  .filter-row .month-label { flex: 1 1 auto; text-align: center; min-width: 0; }
+
+  .login-box { padding: 1.3rem; }
+
+  /* ---- calendar: still a grid, just compact ---- */
+  .calendar-legend { font-size: 0.72rem; gap: 0.6rem; row-gap: 0.3rem; }
+  .calendar-grid { gap: 3px; }
+  .cal-dow { font-size: 0.65rem; }
+  .cal-day { min-height: 56px; padding: 2px; gap: 2px; }
+  .cal-day-num { font-size: 0.68rem; margin-bottom: 0; }
+  .cal-slots { gap: 2px; }
+  .cal-slot-cell {
+    font-size: 0;        /* color-only dot at this size — text would be illegible */
+    min-height: 16px;
+    padding: 0;
+  }
+
+  /* ---- modals: forms use the full screen; short-content modals (slot
+     detail, confirm) stay as a small centered card since forcing them to
+     full height would just leave a wall of empty space below the content ---- */
+  .modal-box { max-width: calc(100% - 1.6rem); padding: 1.2rem; }
+  .overlay:has(.modal-box-full) { padding: 0; align-items: stretch; }
+  .modal-box-full {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    padding: 1.1rem;
+  }
+
+  .form-grid { grid-template-columns: 1fr; }
+  .slot-card-row { gap: 0.5rem; }
+  .slot-card { flex: 1 1 45%; }
+}

@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Real access control: only the two fixed owner/staff Firebase Auth
+// accounts (see functions/index.js and src/js/auth.js) can write this
+// app's data, and only they can read anything except the one settings
+// doc (see below). Checking the specific email — not just
+// `request.auth != null` — matters because Firebase's default
+// Email/Password sign-up lets anyone self-register with ANY email; a bare
+// null-check would let a stranger sign up with their own address and get
+// full access. Restricting to these two known accounts closes that.
+//
+// The settings doc (banquet:settings) is the one exception: it's
+// PUBLICLY READABLE, deliberately. The login screen has to read it
+// *before* anyone is signed in — to know whether to show first-time setup
+// vs. a login prompt, and to check a password against the legacy SHA-256
+// hash during the one-time migration (see auth.js). That doc only holds
+// hall names and one-way password hashes; the hashes were already fully
+// exposed under this collection's previous fully-open rules, so this
+// isn't a new exposure — actual booking/enquiry/payment data stays
+// fully locked behind real auth.
+//
+// Previously (see git history) this whole collection had
+// `allow read, write: if true` — a deliberate placeholder while the app
+// only had a client-side password gate with no real Firebase Auth behind
+// it. That gap is closed as of the accounts migration in
+// auth.js/functions/index.js.
+//
+// NOT YET DEPLOYED as of 2026-08-12 — production is still on the fully
+// open `allow read, write: if true` version above (kept as a comment for
+// reference; see git history / memory for the full story). Do not deploy
+// this file until Cloud Functions are also deployed and the owner has
+// confirmed a successful post-deploy login (see CONTEXT.md's Security
+// section for the exact safe deploy order).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /banquet_kv/{docId} {
+      allow read: if docId == 'banquet:settings' || (
+        request.auth != null &&
+        request.auth.token.email in [
+          'owner@banquet-74423.firebaseapp.com',
+          'staff@banquet-74423.firebaseapp.com'
+        ]
+      );
+      allow write: if request.auth != null &&
+        request.auth.token.email in [
+          'owner@banquet-74423.firebaseapp.com',
+          'staff@banquet-74423.firebaseapp.com'
+        ];
+    }
+  }
+}

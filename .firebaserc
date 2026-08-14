@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "banquet-74423"
+  },
+  "targets": {
+    "banquet-74423": {
+      "hosting": {
+        "main": [
+          "banquet-74423"
+        ],
+        "skpbanquet": [
+          "skpbanquet"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

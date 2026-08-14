@@ -1,0 +1,18 @@
+# Build output — regenerated on every deploy from src/ (see firebase.json's
+# hosting predeploy script). Never hand-edited, never committed.
+public/
+
+# Firebase CLI local cache/hosting metadata.
+.firebase/
+
+# Cloud Functions dependencies (functions/package.json is committed;
+# functions/node_modules is not — see functions/.gitignore too).
+node_modules/
+
+# Emulator debug logs.
+*-debug.log
+firebase-debug.*.log
+
+# OS/editor cruft.
+.DS_Store
+Thumbs.db

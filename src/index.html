@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shree Krishna Palace — Banquet Manager</title>
+<link rel="icon" href="assets/logo-icon.png" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ============================== LOGIN ============================== -->
+<div id="login-screen" class="overlay hidden">
+  <div class="login-box">
+    <img src="assets/logo.png" alt="Shree Krishna Palace" class="login-logo" onerror="this.style.display='none'" />
+    <p class="login-subtitle muted">Banquet Manager</p>
+
+    <div id="login-setup-block" class="hidden">
+      <p class="muted">First time setup — choose an owner password. This unlocks everything, including staff password management.</p>
+      <label>Owner password</label>
+      <input type="password" id="setup-owner-password" autocomplete="new-password" />
+      <label>Confirm password</label>
+      <input type="password" id="setup-owner-password-confirm" autocomplete="new-password" />
+      <div class="modal-error" id="setup-error"></div>
+      <button class="btn btn-primary" id="setup-owner-btn">Set owner password</button>
+    </div>
+
+    <div id="login-normal-block" class="hidden">
+      <label>Password</label>
+      <input type="password" id="login-password" autocomplete="current-password" />
+      <div class="modal-error" id="login-error"></div>
+      <button class="btn btn-primary" id="login-btn">Log in</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== APP SHELL ============================== -->
+<div id="app-shell" class="hidden">
+
+  <header class="app-header">
+    <div class="brand">
+      <img src="assets/logo-icon.png" alt="" class="header-logo" onerror="this.style.display='none'" />
+      <h1>Shree Krishna Palace</h1>
+    </div>
+    <div class="header-right">
+      <span id="role-badge" class="role-badge"></span>
+      <button class="btn btn-sm" id="logout-btn">Log out</button>
+    </div>
+  </header>
+
+  <div id="sync-status" class="sync-status hidden"></div>
+
+  <nav class="tab-nav">
+    <button class="tab-btn active" data-tab="calendar">Calendar</button>
+    <button class="tab-btn hidden" data-tab="dashboard" data-owner-only>Dashboard</button>
+    <button class="tab-btn hidden" data-tab="accounts" data-owner-only>Accounts</button>
+    <button class="tab-btn hidden" data-tab="settings" data-owner-only>Settings</button>
+  </nav>
+
+  <main class="tab-content">
+
+    <!-- -------------------- CALENDAR -------------------- -->
+    <section id="tab-calendar" class="tab-panel active">
+      <div class="filter-row">
+        <button class="btn btn-sm" id="cal-prev">&larr; Prev</button>
+        <span id="cal-month-label" class="month-label"></span>
+        <button class="btn btn-sm" id="cal-next">Next &rarr;</button>
+        <button class="btn btn-sm" id="cal-today">Today</button>
+      </div>
+      <div class="calendar-legend">
+        <span><i class="dot dot-available"></i>Available</span>
+        <span><i class="dot dot-enquiry"></i>Enquiry</span>
+        <span><i class="dot dot-confirmed"></i>Confirmed</span>
+        <span><i class="dot dot-settled"></i>Settled</span>
+      </div>
+      <div id="calendar-grid" class="calendar-grid"></div>
+    </section>
+
+    <!-- -------------------- DASHBOARD -------------------- -->
+    <section id="tab-dashboard" class="tab-panel">
+      <h2 id="dashboard-today-heading">Today</h2>
+      <div id="dashboard-today" class="slot-card-row"></div>
+
+      <h2>Event Summary</h2>
+      <div class="filter-row">
+        <button class="btn btn-sm" id="dash-summary-prev">&larr; Prev</button>
+        <span id="dash-summary-range-label" class="month-label"></span>
+        <button class="btn btn-sm" id="dash-summary-next">Next &rarr;</button>
+        <button class="btn btn-sm" id="dash-summary-this-month">This Month</button>
+      </div>
+      <div class="filter-row">
+        <label class="inline-label">From <input type="date" id="dash-summary-from" /></label>
+        <label class="inline-label">To <input type="date" id="dash-summary-to" /></label>
+      </div>
+      <div id="dashboard-summary" class="acct-summary"></div>
+
+      <h2>Upcoming bookings (next 7 days)</h2>
+      <div id="dashboard-upcoming" class="simple-list"></div>
+
+      <h2>Open enquiries</h2>
+      <div id="dashboard-open-enquiries" class="simple-list"></div>
+    </section>
+
+    <!-- -------------------- ACCOUNTS -------------------- -->
+    <section id="tab-accounts" class="tab-panel">
+      <div class="filter-row">
+        <label class="inline-label">From <input type="date" id="acct-filter-from" /></label>
+        <label class="inline-label">To <input type="date" id="acct-filter-to" /></label>
+        <button class="btn btn-sm" id="acct-download-excel-btn" type="button">Download Excel</button>
+      </div>
+      <div id="accounts-summary" class="acct-summary"></div>
+      <div id="accounts-list" class="acct-list"></div>
+    </section>
+
+    <!-- -------------------- SETTINGS -------------------- -->
+    <section id="tab-settings" class="tab-panel">
+      <h2>Halls</h2>
+      <div id="settings-halls" class="settings-block"></div>
+      <button class="btn btn-primary" id="settings-save-halls">Save hall names</button>
+
+      <h2>Staff password</h2>
+      <div class="settings-block">
+        <p class="muted">Staff can manage bookings and enquiries but cannot see Settings.</p>
+        <label>New staff password</label>
+        <input type="password" id="settings-staff-password" autocomplete="new-password" />
+        <div class="modal-error" id="settings-staff-error"></div>
+        <button class="btn btn-primary" id="settings-save-staff-pw">Save staff password</button>
+      </div>
+
+      <h2>Owner password</h2>
+      <div class="settings-block">
+        <label>New owner password</label>
+        <input type="password" id="settings-owner-password" autocomplete="new-password" />
+        <div class="modal-error" id="settings-owner-error"></div>
+        <button class="btn btn-primary" id="settings-save-owner-pw">Save owner password</button>
+      </div>
+
+      <h2>Sync</h2>
+      <div class="settings-block">
+        <p id="settings-firebase-status" class="muted"></p>
+      </div>
+
+      <h2>Data Deletion</h2>
+      <div class="settings-block">
+        <p class="muted">Permanently delete bookings and enquiries within a date range. This removes them everywhere (this device and the synced cloud copy) and cannot be undone.</p>
+        <div class="form-grid">
+          <label>From <input type="date" id="delete-range-from" /></label>
+          <label>To <input type="date" id="delete-range-to" /></label>
+        </div>
+        <label class="inline-label"><input type="checkbox" id="delete-range-gst-only" /> Only delete settled events that were billed without GST (enquiries are left alone)</label>
+        <button class="btn btn-sm" id="delete-range-preview-btn" type="button">Preview</button>
+        <p class="muted" id="delete-range-preview-summary"></p>
+
+        <div id="delete-range-confirm-block" class="hidden">
+          <label>Type <strong>DELETE</strong> to confirm <input type="text" id="delete-range-confirm-input" autocomplete="off" /></label>
+          <button class="btn btn-danger" id="delete-range-confirm-btn" type="button">Permanently Delete</button>
+        </div>
+        <div class="modal-error" id="delete-range-error"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ============================== MODALS ============================== -->
+
+<!-- Day detail (tapping a day cell — lists all 4 hall/slot rows, each
+     opens the more specific slot-detail modal below). Primarily the
+     mobile entry point, since the grid's individual slot cells shrink to
+     small color-only dots on narrow screens; also reachable on desktop by
+     clicking day whitespace outside the 4 slot cells. -->
+<div id="modal-day" class="overlay hidden">
+  <div class="modal-box">
+    <button class="modal-close" data-close-modal="modal-day">&times;</button>
+    <h2 id="day-modal-title">Day</h2>
+    <div id="day-modal-slots" class="simple-list"></div>
+  </div>
+</div>
+
+<!-- Slot detail (from calendar click) -->
+<div id="modal-slot" class="overlay hidden">
+  <div class="modal-box">
+    <button class="modal-close" data-close-modal="modal-slot">&times;</button>
+    <h2 id="slot-modal-title">Slot</h2>
+    <div id="slot-modal-booking"></div>
+    <div id="slot-modal-enquiries"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="slot-new-enquiry-btn">+ New Enquiry</button>
+      <button class="btn btn-primary" id="slot-new-booking-btn">+ New Booking</button>
+    </div>
+  </div>
+</div>
+
+<!-- Enquiry add/edit -->
+<div id="modal-enquiry" class="overlay hidden">
+  <div class="modal-box modal-box-full">
+    <button class="modal-close" data-close-modal="modal-enquiry">&times;</button>
+    <h2 id="enq-modal-title">New Enquiry</h2>
+    <input type="hidden" id="enq-id" />
+    <input type="hidden" id="enq-orig-date" />
+    <div class="form-grid">
+      <label><span class="label-text">Date<span class="required-star">*</span></span> <input type="date" id="enq-date" /></label>
+      <label><span class="label-text">Hall<span class="required-star">*</span></span> <select id="enq-hall"></select></label>
+      <label><span class="label-text">Slot<span class="required-star">*</span></span> <select id="enq-slot">
+        <option value="lunch">Lunch</option>
+        <option value="dinner">Dinner</option>
+      </select></label>
+      <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="enq-event-type"></select></label>
+      <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="enq-customer" /></label>
+      <label><span class="label-text">Phone<span class="required-star">*</span></span> <input type="text" id="enq-phone" /></label>
+      <label>Email <input type="email" id="enq-email" /></label>
+      <label><span class="label-text">Guest count<span class="required-star">*</span></span> <input type="number" id="enq-guests" min="0" /></label>
+      <label>Status <select id="enq-status">
+        <option value="new">New</option>
+        <option value="followup">Follow-up</option>
+        <option value="lost">Lost</option>
+      </select></label>
+      <label>Follow-up date <input type="date" id="enq-followup-date" /></label>
+    </div>
+    <label>Notes <textarea id="enq-notes" rows="3"></textarea></label>
+    <div class="modal-error" id="enq-error"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="enq-save-btn">Save</button>
+      <button class="btn btn-secondary hidden" id="enq-convert-btn">Convert to Booking</button>
+      <button class="btn btn-danger hidden" id="enq-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Booking add/edit -->
+<div id="modal-booking" class="overlay hidden">
+  <div class="modal-box modal-box-full">
+    <button class="modal-close" data-close-modal="modal-booking">&times;</button>
+    <h2 id="bk-modal-title">New Booking</h2>
+    <input type="hidden" id="bk-id" />
+    <input type="hidden" id="bk-orig-date" />
+    <input type="hidden" id="bk-enquiry-id" />
+    <div class="form-grid">
+      <label><span class="label-text">Date<span class="required-star">*</span></span> <input type="date" id="bk-date" /></label>
+      <label><span class="label-text">Hall<span class="required-star">*</span></span> <select id="bk-hall"></select></label>
+      <label><span class="label-text">Slot<span class="required-star">*</span></span> <select id="bk-slot">
+        <option value="lunch">Lunch</option>
+        <option value="dinner">Dinner</option>
+      </select></label>
+      <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="bk-event-type"></select></label>
+      <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="bk-customer" /></label>
+      <label><span class="label-text">Phone<span class="required-star">*</span></span> <input type="text" id="bk-phone" /></label>
+      <label>Email <input type="email" id="bk-email" /></label>
+      <label><span class="label-text">Guest count<span class="required-star">*</span></span> <input type="number" id="bk-guests" min="0" /></label>
+      <label>Status <select id="bk-status">
+        <option value="confirmed">Confirmed</option>
+        <option value="cancelled">Cancelled</option>
+      </select></label>
+    </div>
+    <label>Notes <textarea id="bk-notes" rows="3"></textarea></label>
+
+    <h3>Advances</h3>
+    <div id="bk-payments-list" class="simple-list"></div>
+    <div id="bk-advance-add-block">
+      <div class="form-grid payment-add-row">
+        <label>Amount <input type="number" id="bk-payment-amount" min="0" /></label>
+        <label>Date <input type="date" id="bk-payment-date" /></label>
+        <label>Mode <select id="bk-payment-mode">
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="card">Card</option>
+          <option value="bank_transfer">Bank Transfer</option>
+          <option value="other">Other</option>
+        </select></label>
+        <label>Note <input type="text" id="bk-payment-note" /></label>
+      </div>
+      <div class="payment-confirm-row">
+        <label><span class="label-text">Received by<span class="required-star">*</span></span> <input type="text" id="bk-payment-receivedby" placeholder="Staff name" /></label>
+        <button class="btn btn-primary" id="bk-add-payment-btn" type="button">Confirm</button>
+      </div>
+      <div class="modal-error" id="bk-payment-error"></div>
+    </div>
+    <p class="balance-line">Total advance received: <strong id="bk-advance-display">₹0</strong></p>
+    <p class="balance-line">Balance due: <strong id="bk-balance-display">₹0</strong></p>
+    <button class="btn btn-sm hidden" id="bk-confirmation-btn" type="button">View Booking Confirmation</button>
+
+    <h3>Menu</h3>
+    <div class="form-grid">
+      <label>Per plate cost <input type="number" id="bk-per-plate-cost" min="0" /></label>
+      <label>Hall rent <input type="number" id="bk-hall-rent" min="0" placeholder="If applicable" /></label>
+      <label>Extra amount <input type="number" id="bk-extra-amount" min="0" placeholder="If applicable" /></label>
+      <label>Reason for extra amount <input type="text" id="bk-extra-amount-reason" placeholder="e.g. Decoration, DJ" /></label>
+    </div>
+    <p class="balance-line">Total amount: <strong id="bk-total-display">₹0</strong></p>
+    <p class="muted" id="bk-menu-summary">No menu items yet.</p>
+    <div class="modal-actions">
+      <button class="btn btn-sm" id="bk-edit-menu-btn" type="button">Edit Menu</button>
+      <button class="btn btn-sm hidden" id="bk-download-menu-btn" type="button">Download Menu PDF</button>
+    </div>
+
+    <h3>Final Settlement</h3>
+    <p class="muted" id="bk-settlement-summary">Not settled yet — record this on or after the event day.</p>
+    <div class="form-grid">
+      <label>Final plate count <input type="number" id="bk-settlement-plates" min="0" /></label>
+      <label>Final per plate cost <input type="number" id="bk-settlement-per-plate-cost" min="0" /></label>
+      <label>Final hall rent <input type="number" id="bk-settlement-hall-rent" min="0" placeholder="If applicable" /></label>
+      <label>Final extra amount <input type="number" id="bk-settlement-extra-amount" min="0" placeholder="If applicable" /></label>
+      <label>Reason for extra amount <input type="text" id="bk-settlement-extra-reason" placeholder="e.g. Decoration, DJ" /></label>
+      <label>Settlement date <input type="date" id="bk-settlement-date" /></label>
+    </div>
+    <label class="inline-label"><input type="checkbox" id="bk-settlement-gst" /> Add GST (5%) to the total</label>
+    <button class="btn btn-primary" id="bk-settlement-calc-btn" type="button">Confirm</button>
+    <div class="modal-error" id="bk-settlement-calc-error"></div>
+
+    <div id="bk-settlement-collection-block" class="hidden">
+      <p class="balance-line">Subtotal: <strong id="bk-settlement-subtotal-display">₹0</strong></p>
+      <p class="balance-line hidden" id="bk-settlement-gst-line">GST (5%): <strong id="bk-settlement-gst-display">₹0</strong></p>
+      <p class="balance-line">Final total: <strong id="bk-settlement-total-display">₹0</strong></p>
+      <p class="balance-line">Advances received: <strong id="bk-settlement-advance-display">₹0</strong></p>
+      <p class="balance-line" id="bk-settlement-collect-line">Amount to be collected: <strong id="bk-settlement-collect-display">₹0</strong></p>
+      <p class="balance-line settlement-recorded-line hidden" id="bk-settlement-recorded-line">Amount collected: <strong id="bk-settlement-recorded-display">₹0</strong> <span id="bk-settlement-recorded-by" class="muted"></span></p>
+      <div class="payment-confirm-row">
+        <label><span class="label-text">Collected by<span class="required-star">*</span></span> <input type="text" id="bk-settlement-settled-by" placeholder="Staff name" /></label>
+        <button class="btn btn-primary" id="bk-settlement-confirm-btn" type="button">Confirm Settlement</button>
+      </div>
+      <div class="modal-error" id="bk-settlement-error"></div>
+    </div>
+
+    <div class="modal-error" id="bk-error"></div>
+    <button class="btn btn-sm hidden" id="bk-event-summary-btn" type="button">View Event Summary</button>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="bk-save-btn">Save</button>
+      <button class="btn btn-danger hidden" id="bk-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu editor (opened on top of the booking modal, which stays open
+     underneath — closing this one just reveals it again, no special
+     reopen logic needed). -->
+<div id="modal-menu" class="overlay hidden">
+  <div class="modal-box modal-box-full">
+    <button class="modal-close" data-close-modal="modal-menu">&times;</button>
+    <h2>Menu</h2>
+    <div id="menu-categories" class="menu-categories"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="menu-done-btn" type="button">Done</button>
+      <button class="btn btn-secondary" id="menu-download-pdf-btn" type="button">Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic confirm dialog -->
+<div id="modal-confirm" class="overlay hidden">
+  <div class="modal-box modal-box-sm">
+    <p id="confirm-message">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="confirm-yes-btn">Yes</button>
+      <button class="btn btn-secondary" id="confirm-no-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================== SCRIPTS ============================== -->
+<script src="js/core.js"></script>
+<script src="js/data-store.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/dashboard-ui.js"></script>
+<script src="js/calendar-ui.js"></script>
+<script src="js/enquiries-ui.js"></script>
+<script src="js/bookings-ui.js"></script>
+<script src="js/accounts-ui.js"></script>
+<script src="js/settings-ui.js"></script>
+<script src="js/init.js"></script>
+</body>
+</html>
