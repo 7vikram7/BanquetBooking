@@ -147,10 +147,46 @@ for any realistic menu.
 
 The header (logo, title, customer/date/venue line) is NOT part of this
 shrink logic — `drawPdfHeader()` (shared with the Booking Confirmation and
-Event Summary PDFs) now takes optional `{titleSize, detailSize}`, and only
-the menu PDF passes larger ones (19.5/13 vs. the other two PDFs' unchanged
-15/10) — a venue's header stays a fixed, predictable size regardless of
-how long its menu is.
+Event Summary PDFs) now takes optional `{titleSize, detailSize,
+emphasizeFields}`, and only the menu PDF passes non-default values (title
+19.5pt vs. the other two PDFs' unchanged 15pt; detail 13pt vs. 10pt).
+
+**Emphasized fields**: with `emphasizeFields: true` (menu PDF only), Date,
+Venue, and Guest count each render **bold at detailSize × 1.8** (23.4pt)
+on their own line, while Customer and Event type stay normal weight at
+detailSize (13pt) — deliberately NOT sharing a line with the emphasized
+fields, since text that size risked overflowing the available header
+width if concatenated inline with other text (mixing font sizes within
+one `doc.text()` call isn't possible in jsPDF anyway; it would need
+per-segment `doc.getTextWidth()` positioning). This also means the header
+itself grew significantly taller (5 short-ish lines vs. 2 longer ones,
+3 of them at 23.4pt) — which is exactly why the body's auto-shrink logic
+above matters: `startY` (where the body starts) is however tall the
+header actually ended up, and the shrink math adapts to whatever's left,
+not a hardcoded assumption. The Date field uses a local
+`formatDateDDMMYYYY()` (DD/MM/YYYY) — deliberately NOT the shared
+`formatDateHuman()` used everywhere else in the app (calendar, other
+PDFs, etc.), so this format change is scoped to just this one field.
+
+**Real bug this surfaced**: the auto-shrink scale calculation originally
+targeted `available = pageHeight - margin - startY` exactly — with the
+taller emphasized-fields header eating substantially more vertical space,
+a realistic case (5 items × all 12 categories) computed a scale that
+should have fit (measured height landed within a fraction of a point of
+the boundary — 801.89pt used vs. an 801.8898pt limit) but still overflowed
+to a 2nd page in the actual rendered PDF, purely from ordinary
+floating-point rounding between the measure and draw passes. Fixed with a
+small fixed buffer (`PAGE_BOTTOM_BUFFER = 10`pt) subtracted from
+`available` before the shrink math runs, so the target is never the exact
+page edge. **Lesson: never compute a fit-to-boundary calculation to
+target 100.000% of the available space — always leave deliberate slack,**
+since measure-pass and draw-pass floating-point arithmetic isn't
+guaranteed to agree to the last fraction of a point even when the code
+path is identical. Also switched the shrink loop from a fixed
+measure-once/correct-twice sequence to a bounded loop (max 5 iterations,
+exits early once it fits) for the same robustness reason — a single
+linear correction is exact only when nothing wraps (e.g. long notes text
+re-wrapping at a different scale is not perfectly linear).
 
 ## Security model — real Firebase Auth, two fixed role accounts
 

@@ -756,10 +756,21 @@ function resizeImageDataUrl(dataUrl, maxWidth) {
 // lines to its right, then a divider. Used by both the menu and
 // event-summary PDFs (identical booking-context header, different body).
 // Returns the y-position where the caller's content should start.
-// titleSize/detailSize default to the original values so the other two PDF
-// types (Booking Confirmation, Event Summary) are unaffected — only
-// generateMenuPdf() passes its own (larger) sizes in.
-async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, detailSize = 10 } = {}) {
+// PDF-only date format (DD/MM/YYYY) for the Menu PDF's emphasized Date
+// field — deliberately NOT touching the shared formatDateHuman() in
+// core.js, which is used all over the rest of the app and elsewhere in
+// this same file; isoDateStr is already zero-padded "YYYY-MM-DD" from the
+// <input type="date">, so this is just a reorder, no Date object needed.
+function formatDateDDMMYYYY(isoDateStr) {
+  if (!isoDateStr) return "—";
+  const [y, m, d] = isoDateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// titleSize/detailSize default to the original values, and emphasizeFields
+// defaults to off, so the other two PDF types (Booking Confirmation, Event
+// Summary) are unaffected — only generateMenuPdf() opts into either.
+async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, detailSize = 10, emphasizeFields = false } = {}) {
   const y = margin;
   let headerTextX = margin;
   let headerBottom = y;
@@ -790,14 +801,40 @@ async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, de
   textY += titleSize * (17 / 15); // same line-gap-to-font-size ratio as the original 15pt/17pt
 
   const availWidth = pageWidth - margin - headerTextX;
-  const detailLine1 = `Customer: ${customer}  ·  Date: ${dateVal ? formatDateHuman(dateVal) : "—"}  ·  Venue: ${hallName(halls, hallId)} — ${slotName(slotId)}`;
-  const detailLine2 = `Event type: ${eventType || "—"}  ·  Guest count: ${guests || "—"}`;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(detailSize);
-  const detailLineHeight = detailSize * 1.3; // same ratio as the original 10pt/13pt
-  for (const line of [...doc.splitTextToSize(detailLine1, availWidth), ...doc.splitTextToSize(detailLine2, availWidth)]) {
-    doc.text(line, headerTextX, textY);
-    textY += detailLineHeight;
+
+  if (emphasizeFields) {
+    // Date/Venue/Guest count each get their own bold, larger line —
+    // deliberately NOT crammed onto a shared line with Customer/Event
+    // type (which stay normal weight/size): at this size (detailSize *
+    // 1.8), mixed-size text sharing a line risks overflowing availWidth,
+    // and separate lines keep each field unambiguous at a glance.
+    const emphSize = detailSize * 1.8;
+    const venueText = `${hallName(halls, hallId)} — ${slotName(slotId)}`;
+    const fields = [
+      { label: "Customer", value: customer, size: detailSize, bold: false },
+      { label: "Date", value: formatDateDDMMYYYY(dateVal), size: emphSize, bold: true },
+      { label: "Venue", value: venueText, size: emphSize, bold: true },
+      { label: "Event type", value: eventType || "—", size: detailSize, bold: false },
+      { label: "Guest count", value: guests || "—", size: emphSize, bold: true },
+    ];
+    for (const f of fields) {
+      doc.setFont("helvetica", f.bold ? "bold" : "normal");
+      doc.setFontSize(f.size);
+      for (const line of doc.splitTextToSize(`${f.label}: ${f.value}`, availWidth)) {
+        doc.text(line, headerTextX, textY);
+        textY += f.size * 1.3; // same line-gap-to-font-size ratio used everywhere else in this header
+      }
+    }
+  } else {
+    const detailLine1 = `Customer: ${customer}  ·  Date: ${dateVal ? formatDateHuman(dateVal) : "—"}  ·  Venue: ${hallName(halls, hallId)} — ${slotName(slotId)}`;
+    const detailLine2 = `Event type: ${eventType || "—"}  ·  Guest count: ${guests || "—"}`;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(detailSize);
+    const detailLineHeight = detailSize * 1.3; // same ratio as the original 10pt/13pt
+    for (const line of [...doc.splitTextToSize(detailLine1, availWidth), ...doc.splitTextToSize(detailLine2, availWidth)]) {
+      doc.text(line, headerTextX, textY);
+      textY += detailLineHeight;
+    }
   }
   headerBottom = Math.max(headerBottom, textY);
 
@@ -935,32 +972,39 @@ async function generateMenuPdf(ev) {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
 
-    const startY = await drawPdfHeader(doc, pageWidth, margin, "Event Menu", { titleSize: 19.5, detailSize: 13 });
+    const startY = await drawPdfHeader(doc, pageWidth, margin, "Event Menu", { titleSize: 19.5, detailSize: 13, emphasizeFields: true });
     const customer = document.getElementById("bk-customer").value.trim() || "Guest";
     const dateVal = document.getElementById("bk-date").value;
     const notesVal = document.getElementById("bk-notes").value.trim();
 
-    const available = pageHeight - margin - startY;
+    // A small buffer, not the literal page boundary — targeting exactly
+    // 100% of the page height left the measured/drawn heights within a
+    // fraction of a point of each other (observed directly: 801.89pt used
+    // vs. an 801.8898pt boundary), so ordinary floating-point rounding
+    // between the measure and draw passes was enough to tip a real case
+    // onto a 2nd page despite the math "fitting". This buffer trades an
+    // invisible amount of blank space for actually reliable fitting.
+    const PAGE_BOTTOM_BUFFER = 10;
+    const available = pageHeight - margin - startY - PAGE_BOTTOM_BUFFER;
     const layoutArgs = { margin, pageWidth, pageHeight, startY, notesVal };
 
     // Measure at full size (scale 1 = the 130% sizes) first — this never
-    // draws or adds pages, just asks "how tall would this be?".
+    // draws or adds pages, just asks "how tall would this be?". Height
+    // scales ~linearly with scale, so this converges in 1-2 corrections in
+    // practice, but loop (bounded) rather than assume — text wrapping
+    // (long notes) isn't perfectly linear, and this is cheap since nothing
+    // is drawn until the loop exits.
     let scale = 1;
-    const measured = layoutMenuBody(doc, { draw: false, scale, ...layoutArgs });
-    if (measured.heightUsed > available) {
-      // Scales roughly linearly with font size, so this estimate lands
-      // very close on the first try; re-measuring (not re-drawing) at the
-      // computed scale confirms it before actually drawing anything.
-      scale = Math.max(MENU_PDF_MIN_SCALE, scale * (available / measured.heightUsed));
-      const remeasured = layoutMenuBody(doc, { draw: false, scale, ...layoutArgs });
-      if (remeasured.heightUsed > available && scale > MENU_PDF_MIN_SCALE) {
-        scale = Math.max(MENU_PDF_MIN_SCALE, scale * (available / remeasured.heightUsed));
-      }
+    for (let i = 0; i < 5; i++) {
+      const { heightUsed } = layoutMenuBody(doc, { draw: false, scale, ...layoutArgs });
+      if (heightUsed <= available || scale <= MENU_PDF_MIN_SCALE) break;
+      scale = Math.max(MENU_PDF_MIN_SCALE, scale * (available / heightUsed));
     }
 
     // Real draw pass at the (possibly shrunk) scale. layoutMenuBody()'s own
     // ensureSpace()/addPage() stays in as a last-resort fallback only —
-    // with the measure pass above, it should never actually trigger.
+    // with the measure loop and buffer above, it shouldn't actually
+    // trigger for any realistic menu.
     layoutMenuBody(doc, { draw: true, scale, ...layoutArgs });
 
     const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
