@@ -21,6 +21,10 @@
 
   --available: #3fa34d;
   --enquiry: #2f7fbf;
+  /* Calendar-grid-only enquiry color — separate from --enquiry so a venue
+     can override just the calendar's look (via applyBranding() in core.js)
+     without recoloring enquiry status pills/borders elsewhere in the app. */
+  --enquiry-calendar: var(--enquiry);
   --tentative: #d99a1f;
   --confirmed: #c0392b;
   --settled: #e8590c;
@@ -210,7 +214,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.35rem; }
 .dot-available { background: var(--available); }
-.dot-enquiry { background: var(--enquiry); }
+.dot-enquiry { background: var(--enquiry-calendar); }
 .dot-tentative { background: var(--tentative); }
 .dot-confirmed { background: var(--confirmed); }
 .dot-settled { background: var(--settled); }
@@ -251,7 +255,7 @@ input[type="number"]::-webkit-inner-spin-button {
   line-height: 1.15;
 }
 .cal-slot-cell.status-available { background: var(--available); color: #fff; }
-.cal-slot-cell.status-enquiry { background: var(--enquiry); }
+.cal-slot-cell.status-enquiry { background: var(--enquiry-calendar); }
 .cal-slot-cell.status-tentative { background: var(--tentative); }
 .cal-slot-cell.status-confirmed { background: var(--confirmed); }
 .cal-slot-cell.status-settled { background: var(--settled); }

@@ -37,6 +37,11 @@ const SITE_CONFIGS = {
     // paths — same pattern this app already uses for any missing asset.
     logo: "assets/logo-saga.png",
     logoIcon: "assets/logo-saga-icon.png",
+    // Only this venue's calendar uses a lighter enquiry color — see
+    // applyBranding() below and --enquiry-calendar in styles.css. Shree
+    // Krishna Palace deliberately has no override here, so it keeps
+    // styles.css's default (same as --enquiry).
+    enquiryColor: "#5dade2",
     firebase: {
       apiKey: "AIzaSyDqDKzWY4no7nmd2PcWgWZYVZzfZNwZF3M",
       authDomain: "saga-banquet-enquiry.firebaseapp.com",
@@ -94,6 +99,10 @@ function applyBranding() {
   if (headerLogo) headerLogo.src = SITE.logoIcon;
   const headerName = document.querySelector(".brand h1");
   if (headerName) headerName.textContent = SITE.name;
+
+  if (SITE.enquiryColor) {
+    document.documentElement.style.setProperty("--enquiry-calendar", SITE.enquiryColor);
+  }
 }
 
 const HALL_DEFAULTS = [
