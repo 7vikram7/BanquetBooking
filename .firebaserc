@@ -23,7 +23,7 @@
     "ramkrishna-banquet-manager": {
       "hosting": {
         "ramkrishnabanquet": [
-          "ramkrishna-banquet-manager"
+          "ramkrishnabanquet"
         ]
       }
     }

@@ -81,6 +81,19 @@ function defaultServiceAccountPath(projectId) {
   return `C:\\Users\\${os.userInfo().username}\\.banquet-credentials\\${projectId}-service-account.json`;
 }
 
+// A brand-new Firebase project's DEFAULT Hosting site is always named
+// exactly <projectId>, giving <projectId>.web.app — that's fixed/immutable.
+// If the requested `host` is anything else, it can only be served by
+// creating a SEPARATE ("secondary") Hosting site with a matching name first
+// (same technique already used for skpbanquet.web.app on banquet-74423) —
+// this function only computes what that site id needs to be; it does NOT
+// create it. Caught in production once already (Ram Krishna Banquet): the
+// target silently bound to the default site, deploying to the wrong URL.
+function deriveSiteId(host, projectId) {
+  if (host && host.endsWith(".web.app")) return host.slice(0, -".web.app".length);
+  return projectId;
+}
+
 function printHelp() {
   console.log(`
 Onboard a new white-labeled venue.
@@ -226,15 +239,20 @@ function addFirebasercTarget(opts) {
   const targetsCloseIdx = findMatchingBracket(src, targetsOpenIdx, "{", "}");
   const targetsBlock = src.slice(targetsOpenIdx, targetsCloseIdx + 1);
 
+  const siteId = deriveSiteId(opts.host, opts.projectId);
+  if (siteId !== opts.projectId) {
+    console.log(`[.firebaserc] host "${opts.host}" needs its own Hosting site (not the project's default). Before deploying, run:\n    firebase hosting:sites:create ${siteId} --project ${opts.projectId}\n  (with the same credentials/env overrides as the deploy command below).`);
+  }
+
   const projectKeyLiteral = `${JSON.stringify(opts.projectId)}: {`;
   const projectKeyIdx = targetsBlock.indexOf(projectKeyLiteral);
 
   if (projectKeyIdx === -1) {
     // Brand new project: add a whole new "<projectId>": { "hosting": {...} } entry.
-    const insertText = `,\n    ${JSON.stringify(opts.projectId)}: {\n      "hosting": {\n        ${JSON.stringify(opts.target)}: [\n          ${JSON.stringify(opts.projectId)}\n        ]\n      }\n    }`;
+    const insertText = `,\n    ${JSON.stringify(opts.projectId)}: {\n      "hosting": {\n        ${JSON.stringify(opts.target)}: [\n          ${JSON.stringify(siteId)}\n        ]\n      }\n    }`;
     const updated = insertBeforeClose(src, targetsCloseIdx, insertText);
     writeFile(FIREBASERC, updated);
-    console.log(`[.firebaserc] Added new project "${opts.projectId}" with hosting target "${opts.target}".`);
+    console.log(`[.firebaserc] Added new project "${opts.projectId}" with hosting target "${opts.target}" -> site "${siteId}".`);
     return true;
   }
 
@@ -254,10 +272,10 @@ function addFirebasercTarget(opts) {
   const hostingOpenAbsIdx = projOpenBraceAbsIdx + hostingMarkerIdx + '"hosting": {'.length - 1;
   const hostingCloseAbsIdx = findMatchingBracket(src, hostingOpenAbsIdx, "{", "}");
 
-  const insertText = `,\n        ${JSON.stringify(opts.target)}: [\n          ${JSON.stringify(opts.projectId)}\n        ]`;
+  const insertText = `,\n        ${JSON.stringify(opts.target)}: [\n          ${JSON.stringify(siteId)}\n        ]`;
   const updated = insertBeforeClose(src, hostingCloseAbsIdx, insertText);
   writeFile(FIREBASERC, updated);
-  console.log(`[.firebaserc] Added hosting target "${opts.target}" to existing project "${opts.projectId}".`);
+  console.log(`[.firebaserc] Added hosting target "${opts.target}" to existing project "${opts.projectId}" -> site "${siteId}".`);
   return true;
 }
 
@@ -339,15 +357,24 @@ async function processLogo(opts) {
 function printDeployInstructions(opts) {
   const isolatedHome = `C:\\\\Temp\\\\isolated-home-${opts.target}`;
   const keyPath = opts.serviceAccountPath || defaultServiceAccountPath(opts.projectId);
+  const siteId = deriveSiteId(opts.host, opts.projectId);
+  const needsSiteCreate = siteId !== opts.projectId;
+  const envPrefix = `USERPROFILE="${isolatedHome}" HOME=/tmp/isolated-home-${opts.target} \\\n     GOOGLE_APPLICATION_CREDENTIALS="${keyPath}"`;
   console.log(`
 Next steps for "${opts.name}" (${opts.host}):
   1. Review the diff:            git diff
   2. Commit it:                  git add -A && git commit -m "Onboard ${opts.name} as a new venue"
-  3. First deploy for this venue, using its own service account (never the
+${needsSiteCreate ? `  3. host "${opts.host}" isn't the project's default site (that would be
+     ${opts.projectId}.web.app) — create the secondary site "${siteId}" FIRST,
+     once, before the first deploy:
+
+     ${envPrefix} \\
+     firebase hosting:sites:create ${siteId} --project ${opts.projectId}
+
+  4.` : `  3.`} First deploy for this venue, using its own service account (never the
      interactively-logged-in personal account — see CONTEXT.md):
 
-     USERPROFILE="${isolatedHome}" HOME=/tmp/isolated-home-${opts.target} \\
-     GOOGLE_APPLICATION_CREDENTIALS="${keyPath}" \\
+     ${envPrefix} \\
      firebase deploy --only hosting:${opts.target} --project ${opts.projectId}
 
      (Deliberately NOT deploying firestore:rules here — this repo's
@@ -357,7 +384,7 @@ Next steps for "${opts.name}" (${opts.host}):
      ${opts.projectId} on its default rules until you've deliberately
      decided what to deploy there.)
 
-  4. Visit https://${opts.host} and confirm branding + a live save/read
+  ${needsSiteCreate ? "5" : "4"}. Visit https://${opts.host} and confirm branding + a live save/read
      round-trip against the new database.
 `);
 }
