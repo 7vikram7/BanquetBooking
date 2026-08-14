@@ -128,7 +128,7 @@ function buildFirebaseStepsSheet(wb) {
     ["Create the Firebase project",
       "Click \"Add project\", name it (e.g. \"My Venue Banquet\"), Analytics is optional (fine to disable), click Create. Wait for provisioning to finish."],
     ["Create the Firestore database",
-      "Left nav: Build > Firestore Database > Create database. Choose \"Start in production mode\". Pick a region NOW — this cannot be changed later without deleting and recreating the database. Click Enable."],
+      "Left nav: Build > Firestore Database > Create database. Choose \"Start in production mode\". Pick a region NOW — this cannot be changed later without deleting and recreating the database. Click Enable. NOTE: \"production mode\" defaults to deny-all security rules — the app will silently fall back to local-only storage (no visible error) until those rules are explicitly opened after the first deploy. onboard-venue.js's printed next-steps cover this; don't skip that step."],
     ["Register a Web App and copy its config",
       "Left nav: Project settings (gear icon) > General tab > scroll to \"Your apps\" > click the </> (Web) icon > give it a nickname > Register app. Firebase Hosting setup in this wizard can be skipped/ignored. Copy the six values shown in the firebaseConfig block (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId) into the matching columns on the \"New Venues\" sheet."],
     ["Create a service account for deploys",

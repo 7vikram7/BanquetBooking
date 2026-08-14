@@ -54,6 +54,9 @@ const FIREBASERC = path.join(ROOT, ".firebaserc");
 const FIREBASE_JSON = path.join(ROOT, "firebase.json");
 const ASSETS_DIR = path.join(ROOT, "src", "assets");
 const TEMPLATE_XLSX = path.join(ROOT, "templates", "venue-onboarding-template.xlsx");
+// Must match FIRESTORE_COLLECTION in src/js/core.js — every venue's data
+// lives under this same collection name in its own separate database.
+const FIRESTORE_COLLECTION_HINT = "banquet_kv";
 
 const REQUIRED = [
   "host", "name", "target", "apiKey", "authDomain", "projectId",
@@ -360,33 +363,29 @@ function printDeployInstructions(opts) {
   const siteId = deriveSiteId(opts.host, opts.projectId);
   const needsSiteCreate = siteId !== opts.projectId;
   const envPrefix = `USERPROFILE="${isolatedHome}" HOME=/tmp/isolated-home-${opts.target} \\\n     GOOGLE_APPLICATION_CREDENTIALS="${keyPath}"`;
-  console.log(`
-Next steps for "${opts.name}" (${opts.host}):
-  1. Review the diff:            git diff
-  2. Commit it:                  git add -A && git commit -m "Onboard ${opts.name} as a new venue"
-${needsSiteCreate ? `  3. host "${opts.host}" isn't the project's default site (that would be
-     ${opts.projectId}.web.app) — create the secondary site "${siteId}" FIRST,
-     once, before the first deploy:
 
-     ${envPrefix} \\
-     firebase hosting:sites:create ${siteId} --project ${opts.projectId}
+  const steps = [
+    `Review the diff:            git diff`,
+    `Commit it:                  git add -A && git commit -m "Onboard ${opts.name} as a new venue"`,
+  ];
+  if (needsSiteCreate) {
+    steps.push(`host "${opts.host}" isn't the project's default site (that would be\n     ${opts.projectId}.web.app) — create the secondary site "${siteId}" FIRST,\n     once, before the first deploy:\n\n     ${envPrefix} \\\n     firebase hosting:sites:create ${siteId} --project ${opts.projectId}`);
+  }
+  steps.push(`First deploy for this venue, using its own service account (never the\n     interactively-logged-in personal account — see CONTEXT.md):\n\n     ${envPrefix} \\\n     firebase deploy --only hosting:${opts.target} --project ${opts.projectId}`);
+  // A brand-new Firestore database created in "production mode" (the setup
+  // checklist's own instruction) defaults to deny-all — the app silently
+  // falls back to local-only storage against that, with no visible error,
+  // until rules are explicitly opened. Learned the hard way onboarding Ram
+  // Krishna Banquet: this is not optional/deferrable like the old wording
+  // here used to imply, it's required for the app to work at all. Uses
+  // `-Encoding ascii` (not utf8) deliberately — PowerShell's utf8 writes a
+  // BOM that the Firestore rules compiler rejects with a cryptic
+  // "token recognition error at: '\ufeff'".
+  steps.push(`Open this venue's Firestore rules — REQUIRED, not optional: a fresh\n     database defaults to deny-all, so skipping this leaves the app silently\n     falling back to local-only storage with no visible error. Run in\n     PowerShell (bash/env-var version needs the same rules content, just\n     via the isolated-HOME pattern above instead):\n\n     cd ${ROOT}\n     Copy-Item firestore.rules firestore.rules.bak\n     @'\nrules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /${FIRESTORE_COLLECTION_HINT}/{docId} {\n      allow read, write: if true;\n    }\n  }\n}\n'@ | Set-Content -Encoding ascii firestore.rules\n     $env:USERPROFILE = '${isolatedHome.replace(/\\\\/g, "\\")}'\n     $env:HOME = '${isolatedHome.replace(/\\\\/g, "\\")}'\n     $env:GOOGLE_APPLICATION_CREDENTIALS = '${keyPath}'\n     firebase.cmd deploy --only firestore:rules --project ${opts.projectId}\n     Move-Item -Force firestore.rules.bak firestore.rules\n\n     Verify without touching the app: curl should return 200 (empty {} is\n     fine, 403 means still locked):\n     curl https://firestore.googleapis.com/v1/projects/${opts.projectId}/databases/(default)/documents/${FIRESTORE_COLLECTION_HINT}`);
+  steps.push(`Visit https://${opts.host} and confirm branding + a live save/read\n     round-trip against the new database.`);
 
-  4.` : `  3.`} First deploy for this venue, using its own service account (never the
-     interactively-logged-in personal account — see CONTEXT.md):
-
-     ${envPrefix} \\
-     firebase deploy --only hosting:${opts.target} --project ${opts.projectId}
-
-     (Deliberately NOT deploying firestore:rules here — this repo's
-     firestore.rules is currently a draft scoped to banquet-74423's own
-     owner@/staff@ emails. Both live venues currently run fully-open
-     Firestore rules configured directly in each project. Leave
-     ${opts.projectId} on its default rules until you've deliberately
-     decided what to deploy there.)
-
-  ${needsSiteCreate ? "5" : "4"}. Visit https://${opts.host} and confirm branding + a live save/read
-     round-trip against the new database.
-`);
+  const numbered = steps.map((s, i) => `  ${i + 1}. ${s}`).join("\n");
+  console.log(`\nNext steps for "${opts.name}" (${opts.host}):\n${numbered}\n`);
 }
 
 async function runExcelMode(excelPath) {
