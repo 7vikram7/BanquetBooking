@@ -26,6 +26,17 @@ function initSettingsTab() {
     refreshHallDependentUI();
   });
 
+  // Timestamp-based id (not a sequential letter) so it can never collide
+  // with an existing hall's id even if halls have been removed/re-added
+  // before — hallId is what bookings/enquiries actually key off of, so a
+  // collision would silently merge two halls' events together.
+  document.getElementById("settings-add-hall").addEventListener("click", async () => {
+    const halls = window.appSettings.halls;
+    halls.push({ id: `hall-${Date.now().toString(36)}`, name: `Hall ${halls.length + 1}` });
+    await saveSettings(window.appSettings);
+    refreshHallDependentUI();
+  });
+
   document.getElementById("settings-save-staff-pw").addEventListener("click", async () => {
     const pwEl = document.getElementById("settings-staff-password");
     const errEl = document.getElementById("settings-staff-error");

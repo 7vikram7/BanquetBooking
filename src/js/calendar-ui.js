@@ -1,4 +1,4 @@
-// calendar-ui.js — month grid of both halls x lunch/dinner, and the shared
+// calendar-ui.js — month grid of every hall x lunch/dinner, and the shared
 // "slot detail" modal (also used by dashboard-ui.js) for viewing/creating
 // bookings & enquiries for one hall+slot+date.
 
@@ -68,7 +68,7 @@ async function renderCalendar() {
     const cell = document.createElement("div");
     cell.className = "cal-day" + (dateIso === today ? " cal-today" : "");
     cell.dataset.date = dateIso;
-    // Whole-day tap target: opens the day-detail modal (all 4 slots at
+    // Whole-day tap target: opens the day-detail modal (every hall/slot at
     // once). This is the primary way in on mobile, where the individual
     // slot cells below shrink to small color-only dots; slot cells stop
     // propagation so a precise tap still jumps straight to that slot.
@@ -112,7 +112,7 @@ function groupByDate(records) {
 }
 
 // ---------------------------------------------------------------------------
-// Day detail modal — lists all 4 hall/slot rows for one date, each
+// Day detail modal — lists every hall/slot row for one date, each
 // drilling into the slot-detail modal below.
 // ---------------------------------------------------------------------------
 

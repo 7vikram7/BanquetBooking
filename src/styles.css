@@ -487,10 +487,10 @@ input[type="number"]::-webkit-inner-spin-button {
 /* =======================================================================
    Mobile (phone) layout — most staff use this app on phones, so this is
    not a cosmetic afterthought. The calendar stays a real 7-column month
-   grid (not an agenda list) — each day cell shrinks to fit, and its 4
+   grid (not an agenda list) — each day cell shrinks to fit, and its
    hall/slot indicators become small color-only dots (no room to keep the
    "1·L" labels legible at this size). Tapping a day opens a day-detail
-   sheet listing all 4 slots at readable size — that's the primary way
+   sheet listing every slot at readable size — that's the primary way
    in; a precise tap directly on a dot still jumps straight to that
    slot's detail via stopPropagation in calendar-ui.js. Every tap target
    also grows to a comfortable thumb size.
