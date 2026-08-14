@@ -25,12 +25,16 @@ rules_version = '2';
 // it. That gap is closed as of the accounts migration in
 // auth.js/functions/index.js.
 //
-// NOT YET DEPLOYED as of 2026-08-12 — production is still on the fully
-// open `allow read, write: if true` version above (kept as a comment for
-// reference; see git history / memory for the full story). Do not deploy
-// this file until Cloud Functions are also deployed and the owner has
-// confirmed a successful post-deploy login (see CONTEXT.md's Security
-// section for the exact safe deploy order).
+// NOT YET DEPLOYED as of 2026-08-14 — this file is checked in as a draft
+// for whenever the Auth migration is revisited (see CONTEXT.md's Security
+// section for the full story and the required safe-deploy order). BOTH
+// this project's database AND saga-banquet-enquiry's are currently on the
+// fully open `allow read, write: if true` rules (deployed directly, not
+// via this file) — see CONTEXT.md's "White-label multi-venue support"
+// section. This file is written against banquet-74423's own
+// OWNER_EMAIL/STAFF_EMAIL and would need the equivalent
+// saga-banquet-enquiry.firebaseapp.com addresses added too before ever
+// being deployed to Saga's project.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /banquet_kv/{docId} {

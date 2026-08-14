@@ -2,29 +2,99 @@
 // Loaded first. No dependencies on other app scripts.
 
 // ---------------------------------------------------------------------------
-// Firebase config — hardcoded client-side on purpose (see CONTEXT.md).
-// Replace the placeholders below with your real Firebase project config
-// (Firebase console → Project settings → General → Your apps → SDK setup).
-// Until replaced, the app runs fully on localStorage only.
+// White-label multi-venue config — ONE shared codebase serves every venue.
+// Which Firebase project (so which database — bookings/enquiries/settings
+// are fully separate per venue) and which branding is active is chosen
+// entirely by which hostname served the page, via SITE_CONFIGS below.
+// There is deliberately no other per-venue branching anywhere else in this
+// codebase — a fix applied here applies to every venue automatically,
+// which is the whole point (see CONTEXT.md's "White-label multi-venue
+// support" section). To add a new venue: add an entry here (its own
+// Firebase project's config + a display name + logo paths) and give it its
+// own Firebase Hosting target pointed at that project — nothing else
+// should need to change.
 // ---------------------------------------------------------------------------
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCbtI6Q0TA8RzhU7lVMQqYOlssFVeV9YYM",
-  authDomain: "banquet-74423.firebaseapp.com",
-  projectId: "banquet-74423",
-  storageBucket: "banquet-74423.firebasestorage.app",
-  messagingSenderId: "272012794305",
-  appId: "1:272012794305:web:fd68b74959951957263740",
+const SITE_CONFIGS = {
+  "banquet-74423.web.app": {
+    name: "Shree Krishna Palace",
+    logo: "assets/logo.png",
+    logoIcon: "assets/logo-icon.png",
+    firebase: {
+      apiKey: "AIzaSyCbtI6Q0TA8RzhU7lVMQqYOlssFVeV9YYM",
+      authDomain: "banquet-74423.firebaseapp.com",
+      projectId: "banquet-74423",
+      storageBucket: "banquet-74423.firebasestorage.app",
+      messagingSenderId: "272012794305",
+      appId: "1:272012794305:web:fd68b74959951957263740",
+    },
+  },
+  "saga-banquet-enquiry.web.app": {
+    name: "Saga Banquet",
+    // No logo supplied yet for this venue — these paths intentionally
+    // don't exist on disk. The <img onerror="this.style.display='none'">
+    // already on the login/header logo elements degrades gracefully
+    // (just hides the broken image) until a real file is added at these
+    // paths — same pattern this app already uses for any missing asset.
+    logo: "assets/logo-saga.png",
+    logoIcon: "assets/logo-saga-icon.png",
+    firebase: {
+      apiKey: "AIzaSyDqDKzWY4no7nmd2PcWgWZYVZzfZNwZF3M",
+      authDomain: "saga-banquet-enquiry.firebaseapp.com",
+      projectId: "saga-banquet-enquiry",
+      storageBucket: "saga-banquet-enquiry.firebasestorage.app",
+      messagingSenderId: "571445664010",
+      appId: "1:571445664010:web:eb2cdbff1d1a004957c2f3",
+    },
+  },
 };
+// skpbanquet.web.app is a second Hosting *target* on the SAME Firebase
+// project as banquet-74423 (see CONTEXT.md) — same database, just a nicer
+// URL — so it deliberately reuses that exact config object, not a copy.
+SITE_CONFIGS["skpbanquet.web.app"] = SITE_CONFIGS["banquet-74423.web.app"];
+
+// Local dev (localhost) and any hostname not in the table above (e.g. a
+// preview/staging URL) fall back to Shree Krishna Palace's config — that's
+// the original venue and the one all local Playwright testing targets.
+const DEFAULT_SITE_KEY = "banquet-74423.web.app";
+const SITE = SITE_CONFIGS[location.hostname] || SITE_CONFIGS[DEFAULT_SITE_KEY];
+
+const FIREBASE_CONFIG = SITE.firebase;
 
 const FIRESTORE_COLLECTION = "banquet_kv";
 
 // Fixed, non-secret pseudo-emails identifying the two roles as real
-// Firebase Auth accounts (see auth.js). Not used for actual email
-// delivery — knowing the address grants nothing without the real
-// password, which is the whole point: unlike the Firestore config, a real
-// password can't be read out of the public client bundle.
-const OWNER_EMAIL = "owner@banquet-74423.firebaseapp.com";
-const STAFF_EMAIL = "staff@banquet-74423.firebaseapp.com";
+// Firebase Auth accounts (see auth.js) — scoped to the active site's own
+// authDomain, since each venue is a fully separate Firebase project with
+// its own Auth users. Not used for actual email delivery — knowing the
+// address grants nothing without the real password, which is the whole
+// point: unlike the Firestore config, a real password can't be read out of
+// the public client bundle.
+const OWNER_EMAIL = `owner@${SITE.firebase.authDomain}`;
+const STAFF_EMAIL = `staff@${SITE.firebase.authDomain}`;
+
+// Applies the active site's branding to the static markup — title, header
+// logo/name, login screen logo/name. Called once at startup (init.js),
+// after the DOM exists (this app's scripts load at the end of <body>, so
+// document elements are already parsed by the time core.js's top-level
+// code runs) but before the login screen is shown.
+function applyBranding() {
+  document.title = `${SITE.name} — Banquet Manager`;
+  const favicon = document.querySelector('link[rel="icon"]');
+  if (favicon) favicon.href = SITE.logoIcon;
+
+  const loginLogo = document.querySelector(".login-logo");
+  if (loginLogo) {
+    loginLogo.src = SITE.logo;
+    loginLogo.alt = SITE.name;
+  }
+  const loginSubtitle = document.querySelector(".login-subtitle");
+  if (loginSubtitle) loginSubtitle.textContent = `${SITE.name} — Banquet Manager`;
+
+  const headerLogo = document.querySelector(".header-logo");
+  if (headerLogo) headerLogo.src = SITE.logoIcon;
+  const headerName = document.querySelector(".brand h1");
+  if (headerName) headerName.textContent = SITE.name;
+}
 
 const HALL_DEFAULTS = [
   { id: "hallA", name: "Hall A" },

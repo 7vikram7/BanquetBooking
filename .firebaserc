@@ -12,6 +12,13 @@
           "skpbanquet"
         ]
       }
+    },
+    "saga-banquet-enquiry": {
+      "hosting": {
+        "saga": [
+          "saga-banquet-enquiry"
+        ]
+      }
     }
   },
   "etags": {}

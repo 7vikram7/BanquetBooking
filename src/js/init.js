@@ -84,6 +84,7 @@ async function onAuthSuccess() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  applyBranding();
   await initFirebase();
   await initAuth(onAuthSuccess);
 });

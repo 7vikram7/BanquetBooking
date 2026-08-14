@@ -16,3 +16,14 @@ firebase-debug.*.log
 # OS/editor cruft.
 .DS_Store
 Thumbs.db
+
+# Service account / credential keys — these must NEVER be committed. Real
+# deploy credentials for this project live outside the repo entirely (see
+# CONTEXT.md's deployment section), but these patterns are a defense-in-depth
+# net in case one is ever dropped in here by mistake (as one was, briefly,
+# before being caught and moved — see git history / project memory).
+*-service-account*.json
+*-adminsdk-*.json
+saga-banquet-enquiry-*.json
+*.pem
+*.key

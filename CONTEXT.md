@@ -141,6 +141,102 @@ set. The existing Playwright suite (which blocks real Firebase network
 calls entirely) continues to exercise the legacy-hash-only fallback path
 unmodified — it never reaches the `window.firebaseReady` branches at all.
 
+## White-label multi-venue support
+
+As of 2026-08-14, one shared codebase serves multiple banquet venues, each
+with its own Firebase project (own database — bookings/enquiries/settings
+never mix) and its own branding, via `SITE_CONFIGS` at the top of
+`core.js`. Which entry is active is chosen entirely by `location.hostname`
+at page load — there is **deliberately no other per-venue branching
+anywhere else in the codebase**. A fix applied to `src/` applies to every
+venue automatically, because it's genuinely the same files deployed to
+each; there is no fork.
+
+**Current venues:**
+- **Shree Krishna Palace** — project `banquet-74423`, hosting targets
+  `main` (`banquet-74423.web.app`) and `skpbanquet` (`skpbanquet.web.app`,
+  a second Hosting *target* on the *same* project — see below). Google
+  account: `pancharatnapimpri@gmail.com`.
+- **Saga Banquet** — project `saga-banquet-enquiry`, hosting target `saga`
+  (`saga-banquet-enquiry.web.app`). Google account:
+  `pingarahospitality@gmail.com`. No logo asset supplied yet — `SITE.logo`/
+  `SITE.logoIcon` point at `assets/logo-saga.png`/`assets/logo-saga-icon.png`,
+  which don't exist on disk; the existing `onerror="this.style.display='none'"`
+  on those `<img>` tags degrades gracefully (just hides the image) until a
+  real file is added at those exact paths.
+
+**To add a new venue**: add an entry to `SITE_CONFIGS` in `core.js` (its
+own Firebase web config + display name + logo paths), then give it its own
+Firebase Hosting target pointed at that project (see deploy mechanics
+below). Nothing else in the code should need to change — if it does,
+that's a bug in this abstraction, not a reason to special-case a venue.
+
+**`applyBranding()`** (`core.js`, called once from `init.js` at
+`DOMContentLoaded`, before `initAuth()`) rewrites `document.title`, the
+favicon, the login screen's logo/alt/subtitle, and the app header's
+logo/name to match the active `SITE` — the static HTML's hardcoded
+"Shree Krishna Palace" text is just the pre-JS/default-fallback content,
+correct for `DEFAULT_SITE_KEY` (also what local dev/Playwright testing
+always sees, since `location.hostname` is `localhost` there).
+
+**Deploy mechanics — the two Google accounts are deliberately never
+merged.** `pancharatnapimpri@gmail.com` (already `firebase login`'d
+interactively on this machine, long before this feature existed) has zero
+access to `saga-banquet-enquiry`, and that's intentional — segregation
+was the whole point of using two separate Google accounts for two
+separate venues in the first place, so don't "fix" this by granting
+cross-account access. Instead, Saga Banquet deploys use a **Google Cloud
+service account key**, scoped only to that one project, stored *outside*
+this repo entirely at `C:\Users\akash\.banquet-credentials\saga-banquet-enquiry-service-account.json`
+(also `.gitignore`'d by pattern as defense-in-depth in case a key like
+this is ever dropped inside the repo again — see git history, one briefly
+was, caught before it was ever staged). The service account needs the
+**Owner** role on that project — Editor alone wasn't sufficient to create
+the Firestore database (see below); this was discovered by hitting a 403
+on that specific step, not assumed upfront.
+
+Using the service account requires bypassing firebase-tools' own cached
+CLI login, which otherwise silently wins over `GOOGLE_APPLICATION_CREDENTIALS`
+for every command (confirmed by testing with a deliberately broken
+credentials path — the error didn't change, proving the env var wasn't
+even being consulted). firebase-tools resolves its "am I logged in"
+config via `os.homedir()`, which on native Windows Node.js reads the
+`USERPROFILE` environment variable — **not** Git Bash's `$HOME` (setting
+`$HOME` alone doesn't work; both look like they should matter but only
+`USERPROFILE` actually does). So every Saga-targeting command needs both
+overridden together, pointed at an empty scratch directory so no cached
+login is found there:
+```
+USERPROFILE="C:\\Temp\\isolated-home" HOME=/tmp/isolated-home \
+GOOGLE_APPLICATION_CREDENTIALS="C:\\Users\\akash\\.banquet-credentials\\saga-banquet-enquiry-service-account.json" \
+firebase <command> --project saga-banquet-enquiry
+```
+Shree Krishna Palace commands need none of this — just run normally,
+using the already-cached `pancharatnapimpri@gmail.com` login.
+
+**Firestore must be created explicitly for a brand-new project** — creating
+a Firebase project does not auto-provision a Firestore database. The first
+`firebase deploy --only firestore:rules` against a project with no database
+yet will create one automatically (Native mode, Standard edition), but
+picks a **default region with no way to ask first** (`nam5`, US
+multi-region, for Saga) — worth deliberately choosing via
+`firebase firestore:databases:create --location <region>` *before* the
+first rules/data deploy if a specific region matters (e.g. lower latency
+for non-US users) — this can't be changed later without deleting and
+recreating the database, which is destructive to any data already in it.
+Saga's `nam5` placement was accepted as fine for this app's usage pattern
+(low-frequency staff bookings, not latency-sensitive) rather than
+redone — flag this to a user if the topic of regions/latency ever comes up
+again, since it's genuinely a one-way door.
+
+**Both venues currently run the fully-open Firestore rules**
+(`allow read, write: if true`) — the locked-down, real-Firebase-Auth
+rules described under "Security model" above are still just a draft
+sitting in `firestore.rules`, written against `banquet-74423`'s own
+`OWNER_EMAIL`/`STAFF_EMAIL` and not deployed to either project. It would
+need the equivalent `saga-banquet-enquiry.firebaseapp.com` addresses added
+too before ever being deployed to Saga specifically.
+
 ## Deployment isolation
 
 `firebase.json`'s `predeploy` runs `rm -rf public && cp -R src public` —
@@ -168,6 +264,6 @@ PATH is consulted and doesn't understand `-p`.
   "Open enquiries" list is the entire follow-up mechanism. Adding real
   notifications would require a server component, which this stack
   deliberately doesn't have.
-- **No multi-tenant support** — one facility, one Firestore project. If
-  managing multiple venues is ever needed, key structure would need a
-  facility ID prefix throughout `data-store.js`.
+- **Multi-tenant since 2026-08**: see the "White-label multi-venue support"
+  section below — one shared codebase, per-hostname Firebase project +
+  branding lookup in `core.js`.
