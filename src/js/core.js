@@ -51,6 +51,19 @@ const SITE_CONFIGS = {
       appId: "1:571445664010:web:eb2cdbff1d1a004957c2f3",
     },
   },
+  "ramkrishnabanquet.web.app": {
+    name: "Ram Krishna Banquet",
+    logo: "assets/logo-ramkrishnabanquet.png",
+    logoIcon: "assets/logo-ramkrishnabanquet-icon.png",
+    firebase: {
+      apiKey: "AIzaSyBeR7K-V_FYzUBk_KF7KAs0JbmquzbvK9I",
+      authDomain: "ramkrishna-banquet-manager.firebaseapp.com",
+      projectId: "ramkrishna-banquet-manager",
+      storageBucket: "ramkrishna-banquet-manager.firebasestorage.app",
+      messagingSenderId: "72612585477",
+      appId: "1:72612585477:web:d2a744b65401f05999fc6c",
+    },
+  },
 };
 // skpbanquet.web.app is a second Hosting *target* on the SAME Firebase
 // project as banquet-74423 (see CONTEXT.md) — same database, just a nicer

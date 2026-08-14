@@ -19,6 +19,13 @@
           "saga-banquet-enquiry"
         ]
       }
+    },
+    "ramkrishna-banquet-manager": {
+      "hosting": {
+        "ramkrishnabanquet": [
+          "ramkrishna-banquet-manager"
+        ]
+      }
     }
   },
   "etags": {}

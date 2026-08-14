@@ -56,6 +56,25 @@
       "predeploy": [
         "rm -rf public && cp -R src public"
       ]
+    },
+    {
+      "target": "ramkrishnabanquet",
+      "public": "public",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "headers": [
+        {
+          "source": "**",
+          "headers": [
+            { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+          ]
+        }
+      ],
+      "rewrites": [
+        { "source": "**", "destination": "/index.html" }
+      ],
+      "predeploy": [
+        "rm -rf public && cp -R src public"
+      ]
     }
   ],
   "firestore": {
