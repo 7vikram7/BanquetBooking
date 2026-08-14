@@ -118,6 +118,40 @@ feature works against localStorage only, which is why README's quick-start
 doesn't require Firebase setup. Firebase is additive (cross-device/staff
 sync), not required.
 
+## Menu PDF sizing — auto-fit, not fixed
+
+`generateMenuPdf()` (`bookings-ui.js`) targets font sizes 130% larger than
+its original v1 sizes (`MENU_PDF_BASE_SIZES` — category/item/notes text
+etc.), but that's a *target*, not a guarantee: the menu's length is
+unbounded (up to all 12 `MENU_CATEGORIES`, each with any number of items,
+plus free-text notes), while the page is fixed (one A4 page — required,
+not negotiable). `layoutMenuBody()` is shared between a measuring pass
+(`draw: false`, no `doc.text()`/`doc.addPage()` calls, just accumulates
+height) and the real draw pass, so the measurement is exact rather than
+estimated. If the 130%-sized content doesn't fit, it's re-measured at a
+smaller `scale` (computed from how much too tall it was, then re-checked)
+down to `MENU_PDF_MIN_SCALE` (0.15) as an absolute backstop.
+
+**What this means in practice** (verified empirically, not just
+estimated): a typical menu (a handful of categories, a few items each)
+renders at the full 130% size. A large one spanning most/all 12
+categories with several items each lands around scale 0.4-0.7 — roughly
+back to the *original*, pre-increase sizes, not smaller. Only a genuinely
+extreme menu (every category maxed out, e.g. 8+ items x all 12
+categories, plus a long notes block) shrinks further, and even then still
+fits on one page — confirmed by parsing the actual page count out of
+generated PDFs, not just eyeballing them. `ensureSpace()`/`doc.addPage()`
+still exist inside `layoutMenuBody()` as a last-resort fallback for the
+theoretical case where even the floor doesn't fit, but shouldn't trigger
+for any realistic menu.
+
+The header (logo, title, customer/date/venue line) is NOT part of this
+shrink logic — `drawPdfHeader()` (shared with the Booking Confirmation and
+Event Summary PDFs) now takes optional `{titleSize, detailSize}`, and only
+the menu PDF passes larger ones (19.5/13 vs. the other two PDFs' unchanged
+15/10) — a venue's header stays a fixed, predictable size regardless of
+how long its menu is.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

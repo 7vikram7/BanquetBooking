@@ -756,7 +756,10 @@ function resizeImageDataUrl(dataUrl, maxWidth) {
 // lines to its right, then a divider. Used by both the menu and
 // event-summary PDFs (identical booking-context header, different body).
 // Returns the y-position where the caller's content should start.
-async function drawPdfHeader(doc, pageWidth, margin, title) {
+// titleSize/detailSize default to the original values so the other two PDF
+// types (Booking Confirmation, Event Summary) are unaffected — only
+// generateMenuPdf() passes its own (larger) sizes in.
+async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, detailSize = 10 } = {}) {
   const y = margin;
   let headerTextX = margin;
   let headerBottom = y;
@@ -782,18 +785,19 @@ async function drawPdfHeader(doc, pageWidth, margin, title) {
 
   let textY = y + 14;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
+  doc.setFontSize(titleSize);
   doc.text(title, headerTextX, textY);
-  textY += 17;
+  textY += titleSize * (17 / 15); // same line-gap-to-font-size ratio as the original 15pt/17pt
 
   const availWidth = pageWidth - margin - headerTextX;
   const detailLine1 = `Customer: ${customer}  ·  Date: ${dateVal ? formatDateHuman(dateVal) : "—"}  ·  Venue: ${hallName(halls, hallId)} — ${slotName(slotId)}`;
   const detailLine2 = `Event type: ${eventType || "—"}  ·  Guest count: ${guests || "—"}`;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(detailSize);
+  const detailLineHeight = detailSize * 1.3; // same ratio as the original 10pt/13pt
   for (const line of [...doc.splitTextToSize(detailLine1, availWidth), ...doc.splitTextToSize(detailLine2, availWidth)]) {
     doc.text(line, headerTextX, textY);
-    textY += 13;
+    textY += detailLineHeight;
   }
   headerBottom = Math.max(headerBottom, textY);
 
@@ -812,6 +816,111 @@ async function drawPdfHeader(doc, pageWidth, margin, title) {
 // modal so a menu can be downloaded without opening the editor at all) —
 // ev.currentTarget picks out whichever one was actually clicked so its
 // label/disabled state updates rather than the other button's.
+// Font sizes are 130% of the original menu-PDF sizes (12/10.5/11 -> these).
+// Spacing constants (line height, gaps) scale with them at the same ratio
+// so the layout's proportions stay consistent, not just the text itself.
+const MENU_PDF_BASE_SIZES = {
+  categorySize: 15.6,   // was 12
+  itemSize: 13.65,      // was 10.5
+  emptySize: 14.3,      // was 11
+  notesHeadingSize: 15.6,  // was 12
+  notesBodySize: 13.65,    // was 10.5
+  lineHeight: 18.2,        // was 14
+  categoryGap: 15.6,       // was 12
+  afterCategoryHeading: 20.8, // was 16
+  emptyStateGap: 26,          // was 20
+  notesTopGap: 7.8,           // was 6
+  afterDivider: 26,            // was 20
+  afterNotesHeading: 20.8,     // was 16
+};
+// If a menu is large enough that the 130% sizes above don't fit on one
+// page, layoutMenuBody() is re-run at a smaller scale until it does. In
+// practice a typical menu (a handful of categories, a few items each)
+// renders at scale 1 (the full 130% sizes); a large one using most/all 12
+// categories with several items each lands somewhere around 0.4-0.7
+// (roughly the original, pre-increase sizes) — tested empirically, not
+// just estimated. This floor (0.15, ~2pt item text) only exists as an
+// absolute backstop for genuinely extreme menus (every category maxed
+// out) so "always fits on one page" can't be silently violated; it's not
+// meant to be legible on its own, and shouldn't be hit by any realistic
+// menu. If even the floor doesn't fit, ensureSpace()/addPage() below is
+// the last-resort fallback.
+const MENU_PDF_MIN_SCALE = 0.15;
+
+// Lays out the menu's variable-length body (categories/items + notes) at a
+// given scale, either measuring (draw:false, no doc.text() calls — just
+// returns the total height it would take) or actually drawing it. Sharing
+// this between the measure and draw passes is what makes the measurement
+// trustworthy — it's the exact same code path, not an approximation.
+function layoutMenuBody(doc, { draw, scale, margin, pageWidth, pageHeight, startY, notesVal }) {
+  const s = MENU_PDF_BASE_SIZES;
+  const lineHeight = s.lineHeight * scale;
+  const categoryGap = s.categoryGap * scale;
+  let y = startY;
+  let overflowed = false;
+
+  function ensureSpace(neededHeight) {
+    if (!draw) return;
+    if (y + neededHeight > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+      overflowed = true;
+    }
+  }
+
+  let anyItems = false;
+  for (const cat of MENU_CATEGORIES) {
+    const items = draftMenu[cat.id] || [];
+    if (!items.length) continue;
+    anyItems = true;
+
+    ensureSpace(s.afterCategoryHeading + items.length * lineHeight);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(s.categorySize * scale);
+    if (draw) doc.text(cat.name, margin, y);
+    y += s.afterCategoryHeading * scale;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(s.itemSize * scale);
+    for (const item of items) {
+      ensureSpace(lineHeight);
+      if (draw) doc.text(`•  ${item}`, margin + 12, y);
+      y += lineHeight;
+    }
+    y += categoryGap;
+  }
+
+  if (!anyItems) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(s.emptySize * scale);
+    if (draw) doc.text("No menu items recorded yet.", margin, y);
+    y += s.emptyStateGap * scale;
+  }
+
+  if (notesVal) {
+    ensureSpace(50 * scale);
+    y += s.notesTopGap * scale;
+    if (draw) {
+      doc.setDrawColor(200);
+      doc.line(margin, y, pageWidth - margin, y);
+    }
+    y += s.afterDivider * scale;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(s.notesHeadingSize * scale);
+    if (draw) doc.text("Notes", margin, y);
+    y += s.afterNotesHeading * scale;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(s.notesBodySize * scale);
+    for (const line of doc.splitTextToSize(notesVal, pageWidth - margin * 2)) {
+      ensureSpace(lineHeight);
+      if (draw) doc.text(line, margin, y);
+      y += lineHeight;
+    }
+  }
+
+  return { finalY: y, heightUsed: y - startY, overflowed };
+}
+
 async function generateMenuPdf(ev) {
   const btn = ev?.currentTarget || document.getElementById("menu-download-pdf-btn");
   const originalLabel = btn.textContent;
@@ -826,68 +935,33 @@ async function generateMenuPdf(ev) {
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 40;
 
-    let y = await drawPdfHeader(doc, pageWidth, margin, "Event Menu");
+    const startY = await drawPdfHeader(doc, pageWidth, margin, "Event Menu", { titleSize: 19.5, detailSize: 13 });
     const customer = document.getElementById("bk-customer").value.trim() || "Guest";
     const dateVal = document.getElementById("bk-date").value;
     const notesVal = document.getElementById("bk-notes").value.trim();
 
-    const lineHeight = 14;
-    const categoryGap = 12;
+    const available = pageHeight - margin - startY;
+    const layoutArgs = { margin, pageWidth, pageHeight, startY, notesVal };
 
-    function ensureSpace(neededHeight) {
-      if (y + neededHeight > pageHeight - margin) {
-        doc.addPage();
-        y = margin;
+    // Measure at full size (scale 1 = the 130% sizes) first — this never
+    // draws or adds pages, just asks "how tall would this be?".
+    let scale = 1;
+    const measured = layoutMenuBody(doc, { draw: false, scale, ...layoutArgs });
+    if (measured.heightUsed > available) {
+      // Scales roughly linearly with font size, so this estimate lands
+      // very close on the first try; re-measuring (not re-drawing) at the
+      // computed scale confirms it before actually drawing anything.
+      scale = Math.max(MENU_PDF_MIN_SCALE, scale * (available / measured.heightUsed));
+      const remeasured = layoutMenuBody(doc, { draw: false, scale, ...layoutArgs });
+      if (remeasured.heightUsed > available && scale > MENU_PDF_MIN_SCALE) {
+        scale = Math.max(MENU_PDF_MIN_SCALE, scale * (available / remeasured.heightUsed));
       }
     }
 
-    let anyItems = false;
-    for (const cat of MENU_CATEGORIES) {
-      const items = draftMenu[cat.id] || [];
-      if (!items.length) continue;
-      anyItems = true;
-
-      ensureSpace(20 + items.length * lineHeight);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text(cat.name, margin, y);
-      y += 16;
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      for (const item of items) {
-        ensureSpace(lineHeight);
-        doc.text(`•  ${item}`, margin + 12, y);
-        y += lineHeight;
-      }
-      y += categoryGap;
-    }
-
-    if (!anyItems) {
-      doc.setFont("helvetica", "italic");
-      doc.setFontSize(11);
-      doc.text("No menu items recorded yet.", margin, y);
-      y += 20;
-    }
-
-    if (notesVal) {
-      ensureSpace(50);
-      y += 6;
-      doc.setDrawColor(200);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 20;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("Notes", margin, y);
-      y += 16;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      for (const line of doc.splitTextToSize(notesVal, pageWidth - margin * 2)) {
-        ensureSpace(lineHeight);
-        doc.text(line, margin, y);
-        y += lineHeight;
-      }
-    }
+    // Real draw pass at the (possibly shrunk) scale. layoutMenuBody()'s own
+    // ensureSpace()/addPage() stays in as a last-resort fallback only —
+    // with the measure pass above, it should never actually trigger.
+    layoutMenuBody(doc, { draw: true, scale, ...layoutArgs });
 
     const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
     doc.save(`Menu - ${filenameSafe} - ${dateVal || "undated"}.pdf`);
