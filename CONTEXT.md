@@ -165,11 +165,17 @@ each; there is no fork.
   on those `<img>` tags degrades gracefully (just hides the image) until a
   real file is added at those exact paths.
 
-**To add a new venue**: add an entry to `SITE_CONFIGS` in `core.js` (its
-own Firebase web config + display name + logo paths), then give it its own
-Firebase Hosting target pointed at that project (see deploy mechanics
-below). Nothing else in the code should need to change — if it does,
-that's a bug in this abstraction, not a reason to special-case a venue.
+**To add a new venue**: run `node scripts/onboard-venue.js --help` for the
+full ordered checklist. In short — the new venue's own Google account
+creates its Firebase project, Firestore database, and a scoped service
+account key first (manual, can't be automated from here); then
+`onboard-venue.js` does the repo-side mechanics in one shot: appends the
+`SITE_CONFIGS` entry in `core.js`, adds the hosting target to
+`.firebaserc`/`firebase.json`, and optionally chroma-keys/trims a supplied
+logo into `src/assets/`. It's idempotent (safe to re-run) and edits are
+surgical text insertions, not parse+re-serialize, so diffs stay minimal.
+Nothing else in the code should need to change — if it does, that's a bug
+in this abstraction, not a reason to special-case a venue.
 
 **`applyBranding()`** (`core.js`, called once from `init.js` at
 `DOMContentLoaded`, before `initAuth()`) rewrites `document.title`, the

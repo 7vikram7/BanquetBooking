@@ -16,6 +16,7 @@ firebase-debug.*.log
 # OS/editor cruft.
 .DS_Store
 Thumbs.db
+~$*.xlsx
 
 # Service account / credential keys — these must NEVER be committed. Real
 # deploy credentials for this project live outside the repo entirely (see

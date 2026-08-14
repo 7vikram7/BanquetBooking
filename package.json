@@ -1,0 +1,9 @@
+{
+  "name": "banquet-tools",
+  "private": true,
+  "description": "Dev-only tooling for this no-build app (venue onboarding, asset processing). Not part of the deployed bundle.",
+  "devDependencies": {
+    "sharp": "^0.33.0",
+    "exceljs": "^4.4.0"
+  }
+}
