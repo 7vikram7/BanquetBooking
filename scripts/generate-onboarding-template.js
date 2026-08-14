@@ -30,6 +30,7 @@ const COLUMNS = [
   { header: "appId", key: "appId", width: 34 },
   { header: "Logo source file path (optional)", key: "logoPath", width: 34 },
   { header: "Service account key path (optional)", key: "serviceAccountPath", width: 40 },
+  { header: "Calendar enquiry color (optional)", key: "enquiryColor", width: 30 },
   { header: "Notes", key: "notes", width: 30 },
 ];
 
@@ -74,6 +75,7 @@ function buildNewVenuesSheet(wb) {
     appId: "1:571445664010:web:eb2cdbff1d1a004957c2f3",
     logoPath: "C:\\banquet\\design-assets\\saga-logo-source.jpeg",
     serviceAccountPath: "",
+    enquiryColor: "#e0629c",
     notes: "Real values from an already-onboarded venue, shown for format reference only.",
   });
   example.eachCell((cell) => { cell.fill = EXAMPLE_FILL; cell.font = EXAMPLE_FONT; });
@@ -104,7 +106,8 @@ function buildColumnGuideSheet(wb) {
     ["Hosting Target (target)", "A short id for this venue, lowercase, no spaces (e.g. myvenue). Used internally by Firebase Hosting and as the logo filename suffix (logo-<target>.png)."],
     ["apiKey / authDomain / projectId / storageBucket / messagingSenderId / appId", "The six fields from the venue's own Firebase project's Web App config (see the \"Firebase Setup Steps\" sheet, step 4, for exactly where to copy these from). None of these are secret — they're shipped in the public client bundle by design — so it's fine to paste them as plain text here."],
     ["Logo source file path (optional)", "A local file path to the venue's logo image, if you have one ready now. Leave blank to skip — branding can be wired up later. Works best with a plain solid-black (or otherwise near-black) background, which gets keyed to transparent automatically."],
-    ["Service account key path (optional)", "Local path to the JSON service-account key downloaded in Setup Step 6. If left blank, the standard convention is assumed: C:\\Users\\<you>\\.banquet-credentials\\<projectId>-service-account.json — so just save it there and you can leave this blank."],
+    ["Service account key path (optional)", "Local path to the JSON service-account key downloaded in Setup Step 8. If left blank, the standard convention is assumed: C:\\Users\\<you>\\.banquet-credentials\\<projectId>-service-account.json — so just save it there and you can leave this blank."],
+    ["Calendar enquiry color (optional)", "A hex color (e.g. #e0629c) to give this venue's own calendar a different \"enquiry\" color from the shared default blue — purely cosmetic, restyles only the calendar grid/legend (not status pills or borders elsewhere). Leave blank to use the shared default."],
     ["Notes", "Anything else worth remembering about this venue — free text, not read by the script."],
   ];
   rows.forEach((r) => {

@@ -223,6 +223,10 @@ from `--enquiry` (used everywhere else: status pills, slot-card borders)
 so a venue can restyle just its calendar without recoloring enquiry
 indicators elsewhere in the app. A venue with no `enquiryColor` set falls
 through to `styles.css`'s default (`--enquiry-calendar: var(--enquiry)`).
+Settable at onboarding time (Excel's "Calendar enquiry color (optional)"
+column, or `--enquiryColor` for the flag-based path) — added after Saga's
+color was originally wired in by hand-editing `core.js`, so a future venue
+doesn't need that follow-up manual step.
 
 ## Venue onboarding tooling
 

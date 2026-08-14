@@ -22,21 +22,26 @@
  *     --target <short hosting target id, e.g. myvenue> \
  *     --apiKey <...> --authDomain <...> --projectId <...> \
  *     --storageBucket <...> --messagingSenderId <...> --appId <...> \
- *     [--logo path/to/logo-source.jpeg]
+ *     [--logo path/to/logo-source.jpeg] [--enquiryColor "#rrggbb"]
  *     One-off path for a single venue without going through Excel.
  *
  * What it does, in order:
- *   1. Appends an entry to SITE_CONFIGS in src/js/core.js
- *   2. Adds a hosting target to .firebaserc (targets.<projectId>.hosting.<target>)
+ *   1. Appends an entry to SITE_CONFIGS in src/js/core.js (including an
+ *      optional enquiryColor, if given — see --enquiryColor above/the
+ *      Excel column of the same name)
+ *   2. Adds a hosting target to .firebaserc (targets.<projectId>.hosting.<target>),
+ *      pointed at a secondary Hosting site instead of the project's default
+ *      one if `host` isn't <projectId>.web.app (see deriveSiteId())
  *   3. Adds a matching hosting block to firebase.json
  *   4. If --logo is given: chroma-keys a solid-black background to
  *      transparent and trims it, writing src/assets/logo-<target>.png
  *      (full lockup) and src/assets/logo-<target>-icon.png (top ~46% crop).
  *      Skip --logo and wire up real files later if the source doesn't have
  *      a plain black background — this heuristic only suits that case.
- *   5. Prints the exact first-deploy command using the service-account /
- *      isolated-HOME pattern (see CONTEXT.md) so the new venue's Firebase
- *      account is never mixed into this machine's interactive CLI login.
+ *   5. Prints the exact first-deploy command (service-account/isolated-HOME
+ *      pattern, see CONTEXT.md), the secondary-site-creation command first
+ *      if step 2 needed one, and the required post-deploy Firestore-rules
+ *      step (a fresh database denies all reads/writes until opened).
  *
  * All three repo-file edits are done as surgical text insertions (not
  * parse+re-serialize), so existing formatting is left untouched and diffs
@@ -77,6 +82,7 @@ const HEADER_MAP = {
   "appId": "appId",
   "Logo source file path (optional)": "logoPath",
   "Service account key path (optional)": "serviceAccountPath",
+  "Calendar enquiry color (optional)": "enquiryColor",
   "Notes": "notes",
 };
 
@@ -134,12 +140,19 @@ THEN run this script — two ways to feed it:
      node scripts/onboard-venue.js --host <...> --name "<...>" --target <...> \\
        --apiKey <...> --authDomain <...> --projectId <...> \\
        --storageBucket <...> --messagingSenderId <...> --appId <...> \\
-       [--logo path\\to\\logo-source.jpeg]
+       [--logo path\\to\\logo-source.jpeg] [--enquiryColor "#rrggbb"]
 
-THEN (also manual, printed again at the end of a successful run):
+THEN (also manual, printed again — fully spelled out — at the end of a
+successful run, since some of these steps only apply conditionally):
   5. Review the diff (git diff) and commit.
-  6. Run the printed first-deploy command.
-  7. If the real-Auth security migration is ever revisited for this venue,
+  6. If prompted: create a secondary Hosting site first (only needed when
+     the requested host isn't <projectId>.web.app).
+  7. Run the printed first-deploy command.
+  8. Open this venue's Firestore rules — REQUIRED, not optional. A fresh
+     database denies all reads/writes by default; skipping this leaves the
+     app silently falling back to local-only storage with no visible error
+     (this happened for real onboarding Ram Krishna Banquet).
+  9. If the real-Auth security migration is ever revisited for this venue,
      add its owner@/staff@<authDomain> addresses to firestore.rules before
      ever deploying firestore:rules to its project — don't deploy that
      file's current contents as-is to a new project.
@@ -208,11 +221,17 @@ function addSiteConfig(opts) {
 
   const logo = `assets/logo-${opts.target}.png`;
   const logoIcon = `assets/logo-${opts.target}-icon.png`;
+  // Optional: only this venue's calendar recolors (see --enquiry-calendar
+  // in styles.css / applyBranding() in core.js) — everything else (status
+  // pills, slot-card borders) stays the shared default either way.
+  const enquiryColorLine = opts.enquiryColor
+    ? `\n    enquiryColor: ${JSON.stringify(opts.enquiryColor)},`
+    : "";
 
   const entry = `  ${hostKeyLiteral}: {
     name: ${JSON.stringify(opts.name)},
     logo: ${JSON.stringify(logo)},
-    logoIcon: ${JSON.stringify(logoIcon)},
+    logoIcon: ${JSON.stringify(logoIcon)},${enquiryColorLine}
     firebase: {
       apiKey: ${JSON.stringify(opts.apiKey)},
       authDomain: ${JSON.stringify(opts.authDomain)},
@@ -436,6 +455,7 @@ async function runExcelMode(excelPath) {
     REQUIRED.forEach((k) => { opts[k] = cellText(row, k); });
     opts.logo = cellText(row, "logoPath");
     opts.serviceAccountPath = cellText(row, "serviceAccountPath");
+    opts.enquiryColor = cellText(row, "enquiryColor");
 
     const missing = REQUIRED.filter((k) => !opts[k]);
     if (missing.length) {
