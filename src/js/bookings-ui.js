@@ -767,6 +767,21 @@ function formatDateDDMMYYYY(isoDateStr) {
   return `${d}/${m}/${y}`;
 }
 
+// jsPDF has no rich-text run within a single doc.text() call, so mixing
+// bold and normal weight on one line means positioning each segment by
+// hand — doc.getTextWidth() (accurate only once the matching font/size is
+// set) gives each segment's width to advance by. All segments share one
+// font size; only weight (bold vs normal) varies per segment.
+function drawTextSegments(doc, x, y, size, segments) {
+  doc.setFontSize(size);
+  let curX = x;
+  for (const seg of segments) {
+    doc.setFont("helvetica", seg.bold ? "bold" : "normal");
+    doc.text(seg.text, curX, y);
+    curX += doc.getTextWidth(seg.text);
+  }
+}
+
 // titleSize/detailSize default to the original values, and emphasizeFields
 // defaults to off, so the other two PDF types (Booking Confirmation, Event
 // Summary) are unaffected — only generateMenuPdf() opts into either.
@@ -775,7 +790,12 @@ async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, de
   let headerTextX = margin;
   let headerBottom = y;
   try {
-    const rawLogoDataUrl = await imageUrlToDataUrl("assets/logo.png");
+    // SITE.logo (core.js) is this venue's own full lockup logo, not a
+    // fixed path — each venue's PDFs must show ITS OWN logo, not whichever
+    // venue happened to be first (all three previously always loaded
+    // "assets/logo.png", Shree Krishna Palace's file, regardless of which
+    // venue's data was actually in the PDF).
+    const rawLogoDataUrl = await imageUrlToDataUrl(SITE.logo);
     const logo = await resizeImageDataUrl(rawLogoDataUrl, 300);
     const logoWidth = 80;
     const logoHeight = logoWidth * (logo.height / logo.width);
@@ -783,7 +803,14 @@ async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, de
     headerTextX = margin + logoWidth + 16;
     headerBottom = Math.max(headerBottom, y + logoHeight);
   } catch (err) {
-    console.warn("[pdf] logo failed to load, continuing without it", err);
+    // No logo file for this venue yet (e.g. a freshly onboarded one) —
+    // fall back to the venue's name as bold text instead of leaving a
+    // blank gap where a logo would be.
+    console.warn("[pdf] logo failed to load, falling back to venue name", err);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(SITE.name, margin, y + 16);
+    headerBottom = Math.max(headerBottom, y + 20);
   }
 
   const halls = window.appSettings.halls;
@@ -803,28 +830,23 @@ async function drawPdfHeader(doc, pageWidth, margin, title, { titleSize = 15, de
   const availWidth = pageWidth - margin - headerTextX;
 
   if (emphasizeFields) {
-    // Date/Venue/Guest count each get their own bold, larger line —
-    // deliberately NOT crammed onto a shared line with Customer/Event
-    // type (which stay normal weight/size): at this size (detailSize *
-    // 1.8), mixed-size text sharing a line risks overflowing availWidth,
-    // and separate lines keep each field unambiguous at a glance.
-    const emphSize = detailSize * 1.8;
+    // Date/Venue/Guest count are bold, same size as everything else on
+    // this line — an earlier version made them 80% larger on their own
+    // lines, which looked disproportionate; weight alone is enough
+    // emphasis without breaking the line-per-line layout below.
     const venueText = `${hallName(halls, hallId)} — ${slotName(slotId)}`;
-    const fields = [
-      { label: "Customer", value: customer, size: detailSize, bold: false },
-      { label: "Date", value: formatDateDDMMYYYY(dateVal), size: emphSize, bold: true },
-      { label: "Venue", value: venueText, size: emphSize, bold: true },
-      { label: "Event type", value: eventType || "—", size: detailSize, bold: false },
-      { label: "Guest count", value: guests || "—", size: emphSize, bold: true },
-    ];
-    for (const f of fields) {
-      doc.setFont("helvetica", f.bold ? "bold" : "normal");
-      doc.setFontSize(f.size);
-      for (const line of doc.splitTextToSize(`${f.label}: ${f.value}`, availWidth)) {
-        doc.text(line, headerTextX, textY);
-        textY += f.size * 1.3; // same line-gap-to-font-size ratio used everywhere else in this header
-      }
-    }
+    drawTextSegments(doc, headerTextX, textY, detailSize, [
+      { text: `Customer: ${customer}  ·  Date: `, bold: false },
+      { text: formatDateDDMMYYYY(dateVal), bold: true },
+      { text: "  ·  Venue: ", bold: false },
+      { text: venueText, bold: true },
+    ]);
+    textY += detailSize * 1.3;
+    drawTextSegments(doc, headerTextX, textY, detailSize, [
+      { text: `Event type: ${eventType || "—"}  ·  Guest count: `, bold: false },
+      { text: guests || "—", bold: true },
+    ]);
+    textY += detailSize * 1.3;
   } else {
     const detailLine1 = `Customer: ${customer}  ·  Date: ${dateVal ? formatDateHuman(dateVal) : "—"}  ·  Venue: ${hallName(halls, hallId)} — ${slotName(slotId)}`;
     const detailLine2 = `Event type: ${eventType || "—"}  ·  Guest count: ${guests || "—"}`;

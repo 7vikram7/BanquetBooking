@@ -152,21 +152,31 @@ emphasizeFields}`, and only the menu PDF passes non-default values (title
 19.5pt vs. the other two PDFs' unchanged 15pt; detail 13pt vs. 10pt).
 
 **Emphasized fields**: with `emphasizeFields: true` (menu PDF only), Date,
-Venue, and Guest count each render **bold at detailSize × 1.8** (23.4pt)
-on their own line, while Customer and Event type stay normal weight at
-detailSize (13pt) — deliberately NOT sharing a line with the emphasized
-fields, since text that size risked overflowing the available header
-width if concatenated inline with other text (mixing font sizes within
-one `doc.text()` call isn't possible in jsPDF anyway; it would need
-per-segment `doc.getTextWidth()` positioning). This also means the header
-itself grew significantly taller (5 short-ish lines vs. 2 longer ones,
-3 of them at 23.4pt) — which is exactly why the body's auto-shrink logic
-above matters: `startY` (where the body starts) is however tall the
-header actually ended up, and the shrink math adapts to whatever's left,
-not a hardcoded assumption. The Date field uses a local
+Venue, and Guest count render **bold**, same `detailSize` (13pt) as
+everything else on the line — an earlier version made them 80% larger
+(23.4pt) on their own dedicated lines, which looked disproportionate once
+seen rendered; weight alone is enough emphasis, and it keeps the original
+2-line layout (Customer+Date+Venue / Event type+Guest count) intact.
+Since jsPDF's `doc.text()` can't mix weights within one call, bold and
+normal segments on the same line are positioned manually via the small
+`drawTextSegments()` helper (`doc.getTextWidth()` after each segment's
+font/size is set, to know where the next one starts) — this only works
+cleanly because every segment on the line shares one font size; mixing
+weight is easy, mixing size is what would force a rethink (per-segment
+line-height bookkeeping). The Date field uses a local
 `formatDateDDMMYYYY()` (DD/MM/YYYY) — deliberately NOT the shared
 `formatDateHuman()` used everywhere else in the app (calendar, other
 PDFs, etc.), so this format change is scoped to just this one field.
+
+**Logo is venue-specific, with a name fallback**: `drawPdfHeader()` (all
+three PDF types) used to hardcode `imageUrlToDataUrl("assets/logo.png")`
+— Shree Krishna Palace's own file — regardless of which venue's data was
+actually in the PDF, so every venue's downloads showed the same logo.
+Fixed to load `SITE.logo` (the active venue's own full lockup, from
+`SITE_CONFIGS` — see "White-label multi-venue support" above), and the
+existing try/catch around the image load (already there for a missing
+logo file, e.g. a freshly onboarded venue with no logo yet) now renders
+`SITE.name` as bold text in that space instead of leaving it blank.
 
 **Real bug this surfaced**: the auto-shrink scale calculation originally
 targeted `available = pageHeight - margin - startY` exactly — with the
