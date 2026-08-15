@@ -425,6 +425,16 @@ The container shows a "press Search to load entries" placeholder until
 then. Download Excel is unaffected — it already reads the current
 From/To values directly and can be used without pressing Search first.
 
+Because the backfill scan can take real time against Firestore,
+`renderDirectoryList()` sets its loading state (disables `dir-search-btn`,
+relabels it "Searching…", and replaces the list with a "Loading…"
+message) synchronously before its first `await` — verified with a
+Playwright script that clicks Search and inspects the DOM in the same
+synchronous `page.evaluate()` call, i.e. before the browser has had a
+chance to run any of the pending async work, and confirmed the loading
+state is already showing at that point. Wrapped in `try/finally` so the
+button re-enables and its label resets even if the fetch throws.
+
 **Real bug: the tab looked broken because of its default date range, not
 because entries weren't being logged.** The first version copied
 Accounts' "default to the current month" pattern (`initDirectoryTab()`

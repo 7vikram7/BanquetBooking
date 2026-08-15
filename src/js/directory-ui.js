@@ -140,25 +140,42 @@ async function directoryEntriesInRange() {
 
 async function renderDirectoryList() {
   const container = document.getElementById("directory-list");
-  const entries = await directoryEntriesInRange();
+  const searchBtn = document.getElementById("dir-search-btn");
 
-  if (!entries.length) {
-    container.innerHTML = '<div class="simple-list-empty">No customer entries in this date range.</div>';
-    return;
+  // The backfill this triggers (ensureDirectoryBackfilled(), inside
+  // directoryEntriesInRange()) scans up to 15 years of Firestore data —
+  // visibly slower than the rest of the app, so it needs its own loading
+  // state rather than leaving the previous list (or the initial
+  // placeholder) on screen with no indication anything is happening.
+  const originalLabel = searchBtn.textContent;
+  searchBtn.disabled = true;
+  searchBtn.textContent = "Searching…";
+  container.innerHTML = '<div class="simple-list-empty">Loading…</div>';
+
+  try {
+    const entries = await directoryEntriesInRange();
+
+    if (!entries.length) {
+      container.innerHTML = '<div class="simple-list-empty">No customer entries in this date range.</div>';
+      return;
+    }
+
+    container.innerHTML = "";
+    entries.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.className = "acct-row";
+      row.innerHTML = `
+        <div class="acct-row-summary">
+          <span>#${idx + 1} · ${escapeHtml(entry.customerName)}${entry.phone ? " · " + escapeHtml(entry.phone) : ""}</span>
+          <span class="acct-row-money">${formatDateHuman(entry.date)} · ${escapeHtml(entry.eventType || "")} · ${escapeHtml(entry.source || "")}</span>
+        </div>
+      `;
+      container.appendChild(row);
+    });
+  } finally {
+    searchBtn.disabled = false;
+    searchBtn.textContent = originalLabel;
   }
-
-  container.innerHTML = "";
-  entries.forEach((entry, idx) => {
-    const row = document.createElement("div");
-    row.className = "acct-row";
-    row.innerHTML = `
-      <div class="acct-row-summary">
-        <span>#${idx + 1} · ${escapeHtml(entry.customerName)}${entry.phone ? " · " + escapeHtml(entry.phone) : ""}</span>
-        <span class="acct-row-money">${formatDateHuman(entry.date)} · ${escapeHtml(entry.eventType || "")} · ${escapeHtml(entry.source || "")}</span>
-      </div>
-    `;
-    container.appendChild(row);
-  });
 }
 
 // Same lazy-load-SheetJS-on-click pattern as generateAccountsExcel() in
