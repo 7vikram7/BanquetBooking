@@ -663,8 +663,18 @@ each; there is no fork.
   (also named `ramkrishnabanquet`) inside that project, *not* its default
   site (`ramkrishna-banquet-manager.web.app`, which is deployed but
   unused/orphaned) — see "Custom hosting URL needs a secondary Hosting
-  site" below for why. No logo supplied yet (degrades gracefully, same
-  pattern as Saga initially had).
+  site" below for why. Logo added later (`assets/logo-ramkrishnabanquet.png`,
+  chroma-keyed/trimmed from a supplied black-background source the same
+  way `onboard-venue.js --logo` would). **`logoIcon` is a byte-for-byte
+  copy of the full `logo`, not a top-crop** — unlike Shree Krishna
+  Palace/Saga, whose logos are icon-glyph-then-wordmark (so the
+  standard top-46% auto-crop isolates a clean standalone mark), this
+  logo is wordmark-only with no separate icon element. The auto-crop
+  was tried first and shipped briefly — it just cut the wordmark off
+  mid-letter in the 34px-tall header bar ("only half the logo is
+  visible", reported immediately after deploy) since there's no icon
+  glyph for that crop to isolate. Fixed by pointing `logoIcon` at the
+  same full-lockup file as `logo` instead of a crop.
 
 **Per-venue theming beyond logo/name**: a venue can optionally set
 `enquiryColor` in its `SITE_CONFIGS` entry (e.g. Saga's `"#e0629c"`,
