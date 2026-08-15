@@ -44,7 +44,66 @@ function directoryDateRange() {
   return { from: fromVal || defaults.from, to: toVal || defaults.to };
 }
 
+// Directory entries are only ever WRITTEN at creation time (saveEnquiry()/
+// saveBooking()'s new-record branch) — so anything created before this
+// feature existed has no directory entry at all and would otherwise never
+// show up, no matter how wide the date filter is. This backfills those in,
+// scanning a much wider window than the tab's own display range (real
+// bookings/enquiries could predate the Directory feature by longer than
+// the display default's 2-year lookback). Idempotent via `sourceId` (the
+// originating booking/enquiry's own id) — already-backfilled or
+// normally-logged records are skipped, so this is safe to run every time
+// the tab loads, not just once.
+//
+// Deliberately does NOT skip a record for having a blank customerName/
+// phone/eventType — every enquiry and booking gets a directory entry
+// unconditionally, incomplete or not; filtering by field completeness
+// would just recreate the exact "data goes missing for no visible reason"
+// problem this whole feature exists to avoid.
+const DIRECTORY_BACKFILL_YEARS_BACK = 15;
+const DIRECTORY_BACKFILL_YEARS_FORWARD = 5;
+let directoryBackfillDone = false;
+
+async function ensureDirectoryBackfilled() {
+  if (directoryBackfillDone) return;
+  const today = new Date();
+  const from = isoDate(new Date(today.getFullYear() - DIRECTORY_BACKFILL_YEARS_BACK, today.getMonth(), today.getDate()));
+  const to = isoDate(new Date(today.getFullYear() + DIRECTORY_BACKFILL_YEARS_FORWARD, today.getMonth(), today.getDate()));
+
+  const [existingEntries, enquiries, bookings] = await Promise.all([
+    DirectoryStore.getRange(from, to),
+    EnquiriesStore.getRange(from, to),
+    BookingsStore.getRange(from, to),
+  ]);
+  const alreadyLogged = new Set(existingEntries.map((e) => e.sourceId).filter(Boolean));
+
+  for (const enq of enquiries) {
+    if (alreadyLogged.has(enq.id)) continue;
+    await addDirectoryEntry({
+      date: enq.date,
+      customerName: enq.customerName,
+      phone: enq.phone,
+      eventType: enq.eventType,
+      source: "Enquiry",
+      sourceId: enq.id,
+    });
+  }
+  for (const bk of bookings) {
+    if (alreadyLogged.has(bk.id)) continue;
+    await addDirectoryEntry({
+      date: bk.date,
+      customerName: bk.customerName,
+      phone: bk.phone,
+      eventType: bk.eventType,
+      source: "Booking",
+      sourceId: bk.id,
+    });
+  }
+  directoryBackfillDone = true;
+}
+
 async function directoryEntriesInRange() {
+  await ensureDirectoryBackfilled();
   const { from, to } = directoryDateRange();
   const entries = await DirectoryStore.getRange(from, to);
   entries.sort((a, b) => a.date.localeCompare(b.date) || (a.loggedAt || "").localeCompare(b.loggedAt || ""));

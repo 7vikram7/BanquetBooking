@@ -112,8 +112,9 @@ async function saveEnquiry() {
     const origDate = document.getElementById("enq-orig-date").value;
     await EnquiriesStore.updateRecord(id, origDate, data);
   } else {
+    const newId = uid("enq");
     await EnquiriesStore.addRecord({
-      id: uid("enq"),
+      id: newId,
       createdAt: new Date().toISOString(),
       ...data,
     });
@@ -123,6 +124,7 @@ async function saveEnquiry() {
       phone: data.phone,
       eventType: data.eventType,
       source: "Enquiry",
+      sourceId: newId,
     });
   }
   closeModal("modal-enquiry");

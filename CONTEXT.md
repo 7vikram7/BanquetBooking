@@ -429,6 +429,40 @@ plus past history without being fully unbounded. `directoryDateRange()`
 same wide default if the From/To inputs are ever cleared, consistent
 with how Accounts falls back to its own (correctly narrow) default.
 
+**Second real bug, reported after the date-range fix shipped: bookings/
+enquiries created BEFORE the Directory feature existed never showed up
+at all**, no matter how the date filter was set — because directory
+entries are only ever written at creation time
+(`saveEnquiry()`/`saveBooking()`'s new-record branch), there was no
+mechanism backfilling entries for records that already existed when this
+feature shipped. Fixed with `ensureDirectoryBackfilled()`
+(`directory-ui.js`), called automatically at the start of every
+`directoryEntriesInRange()` (so before both the list render and the Excel
+export — no separate button to remember to click): scans a much wider
+window than the tab's own display default (`DIRECTORY_BACKFILL_YEARS_BACK/
+FORWARD` = 15/5, vs. the display default's 2/2 — real historical data
+could predate this feature by longer than the display range's own
+lookback), and for every enquiry/booking in that window, adds a directory
+entry unless one already exists for it.
+
+**Idempotency**: `addDirectoryEntry()` now takes a `sourceId` (the
+originating booking/enquiry's own `id`) precisely so the backfill can
+tell "already logged" apart from "never logged" and skip the former —
+verified directly by revisiting the Directory tab twice in one session
+and confirming the row count didn't double. `directoryBackfillDone` (a
+module-level flag) additionally limits this to once per page load rather
+than re-scanning on every single tab switch within the same session,
+though the `sourceId` check alone would already make repeat runs safe.
+
+**Deliberately does NOT skip a record for having a blank customerName/
+phone/eventType** — filtering incomplete records out of the backfill
+would just recreate the exact "data silently doesn't show up, for a
+reason that isn't obvious from the UI" problem this feature exists to
+prevent. Verified with a record that had empty `customerName`/`phone`
+written directly to `EnquiriesStore` (simulating genuinely old or
+incomplete real data) — confirmed it gets backfilled into the directory
+like any other record, not silently dropped.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

@@ -585,8 +585,9 @@ async function saveBooking() {
     const origDate = document.getElementById("bk-orig-date").value;
     savedBooking = await BookingsStore.updateRecord(id, origDate, data);
   } else {
+    const newId = uid("bk");
     savedBooking = await BookingsStore.addRecord({
-      id: uid("bk"),
+      id: newId,
       createdAt: new Date().toISOString(),
       enquiryId: pendingEnquiryLink?.id || null,
       ...data,
@@ -602,6 +603,7 @@ async function saveBooking() {
       phone: data.phone,
       eventType: data.eventType,
       source: "Booking",
+      sourceId: newId,
     });
     if (pendingEnquiryLink) {
       // No "converted" status — once an enquiry becomes a booking, the

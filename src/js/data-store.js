@@ -258,11 +258,16 @@ const EnquiriesStore = createDateBucketStore("enquiries");
 const DirectoryStore = createDateBucketStore("directory");
 
 // Shared by saveEnquiry()/saveBooking() (see enquiries-ui.js/bookings-ui.js)
-// so both feed the same permanent log the same way. `date` here is the
+// AND directory-ui.js's backfill (see ensureDirectoryBackfilled() there —
+// bookings/enquiries created before this feature existed never got a
+// directory entry at creation time, since that only happens going
+// forward; the backfill catches those up). `date` here is the
 // event/occasion date (this app's existing meaning of "date" on an
 // enquiry or booking record), not when the entry was logged — `loggedAt`
 // separately captures that, in case the two ever need to be told apart.
-async function addDirectoryEntry({ date, customerName, phone, eventType, source }) {
+// `sourceId` is the originating booking/enquiry's own id — what makes the
+// backfill idempotent (safe to re-run: it checks this before adding).
+async function addDirectoryEntry({ date, customerName, phone, eventType, source, sourceId }) {
   await DirectoryStore.addRecord({
     id: uid("dir"),
     date,
@@ -270,6 +275,7 @@ async function addDirectoryEntry({ date, customerName, phone, eventType, source 
     phone,
     eventType,
     source,
+    sourceId,
     loggedAt: new Date().toISOString(),
   });
 }
