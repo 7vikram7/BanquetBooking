@@ -123,7 +123,12 @@ pattern and why it's necessary on Windows.
 `predeploy` mirrors `src/` into an isolated `public/` folder that Hosting
 actually serves (see `firebase.json`) — this keeps anything else in the
 project directory (this doc, scripts, templates) from accidentally going
-live.
+live. A second predeploy step (`scripts/patch-html-meta.js <hostname>`)
+then rewrites that copy's `<title>`, favicon, and Open Graph tags to
+match the venue actually being deployed — required because link-preview
+crawlers (WhatsApp, etc.) never run the client-side branding JS, so
+without this every venue's shared links showed Shree Krishna Palace's
+name/logo. `onboard-venue.js` wires this up automatically for new venues.
 
 **Windows note**: `predeploy` uses `rm`/`cp`, and `firebase` itself is a
 PowerShell script (`firebase.ps1`) that the default execution policy

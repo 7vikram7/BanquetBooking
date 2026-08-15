@@ -16,7 +16,8 @@
         { "source": "**", "destination": "/index.html" }
       ],
       "predeploy": [
-        "rm -rf public && cp -R src public"
+        "rm -rf public && cp -R src public",
+        "node scripts/patch-html-meta.js banquet-74423.web.app"
       ]
     },
     {
@@ -35,7 +36,8 @@
         { "source": "**", "destination": "/index.html" }
       ],
       "predeploy": [
-        "rm -rf public && cp -R src public"
+        "rm -rf public && cp -R src public",
+        "node scripts/patch-html-meta.js skpbanquet.web.app"
       ]
     },
     {
@@ -54,7 +56,8 @@
         { "source": "**", "destination": "/index.html" }
       ],
       "predeploy": [
-        "rm -rf public && cp -R src public"
+        "rm -rf public && cp -R src public",
+        "node scripts/patch-html-meta.js saga-banquet-enquiry.web.app"
       ]
     },
     {
@@ -73,7 +76,8 @@
         { "source": "**", "destination": "/index.html" }
       ],
       "predeploy": [
-        "rm -rf public && cp -R src public"
+        "rm -rf public && cp -R src public",
+        "node scripts/patch-html-meta.js ramkrishnabanquet.web.app"
       ]
     }
   ],

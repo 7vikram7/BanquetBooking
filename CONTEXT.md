@@ -676,6 +676,60 @@ the destination directory itself when it doesn't exist yet — `mkdir -p`
 was avoided because cmd.exe's builtin `mkdir` intercepts the call before
 PATH is consulted and doesn't understand `-p`.
 
+## Per-venue `<title>`/favicon/Open Graph tags — a second predeploy step
+
+`applyBranding()` (`core.js`) sets `document.title`/the favicon
+client-side, at `DOMContentLoaded` — fine for an actual visitor, but
+link-preview crawlers (WhatsApp, iMessage, Slack, etc.) fetch the raw
+HTML and never run JavaScript. Every venue's shared PDFs/Share-via-
+WhatsApp links were showing "Shree Krishna Palace — Banquet Manager" —
+caught from a real WhatsApp share of a Ram Krishna Banquet/Saga link,
+not proactively. `src/index.html`'s static `<title>`/favicon `<link>`
+(and, until now, complete absence of Open Graph meta tags) is genuinely
+shared/generic across every venue's deploy — there is still no per-venue
+*source* fork.
+
+Fixed with a second `predeploy` command, per hosting target, added
+*after* `cp -R src public`: `node scripts/patch-html-meta.js <hostname>`
+(`scripts/patch-html-meta.js`, new). It patches the just-copied
+`public/index.html` only — never `src/index.html` — rewriting `<title>`,
+the favicon `<link>`, and injecting `og:title`/`og:site_name`/
+`og:description`/`og:image`/`og:url`/`og:type`. The venue's name/logo/
+logoIcon are read directly out of `core.js`'s `SITE_CONFIGS` via the same
+text-based brace-matching technique `onboard-venue.js` uses to *write*
+entries (can't `require()`/eval core.js directly — it references browser
+globals like `location`/`document` at its top level) — one source of
+truth, no risk of a second copy drifting out of sync. Also resolves
+`SITE_CONFIGS` **aliases** (e.g. `skpbanquet.web.app`, which has no
+literal entry of its own — see "White-label multi-venue support" above —
+just `SITE_CONFIGS["skpbanquet.web.app"] = SITE_CONFIGS["banquet-74423.web.app"]`)
+by pattern-matching that assignment and resolving to whichever hostname
+it points at.
+
+`onboard-venue.js`'s `addFirebaseJsonHosting()` clones an existing
+hosting-array entry as a template for a new venue and swaps its
+`"target"` field — it now ALSO swaps the cloned predeploy step's hostname
+argument to the new venue's own `host`, or a newly onboarded venue would
+silently inherit the *template* venue's branding in its link previews
+instead of its own (easy to miss since it's just a shell-command string
+inside a JSON array, not a structured field with its own validation).
+
+**Caught by testing, not assumed**: a first attempt at deploying this
+appeared to work from the CLI's log (`+ Finished running predeploy
+script.`) but the live site's HTML had no Open Graph tags at all — the
+CLI log only ever echoed the *first* predeploy command's "Running
+command:" line, never the second. Root cause turned out to be mundane:
+an intermediate `git checkout -- firebase.json` (used to clean up an
+unrelated dummy test venue) had reverted this fix's own still-uncommitted
+`firebase.json` edits right along with it, since neither was committed
+yet — `git checkout` reverts the whole file to its last commit,
+indiscriminately. Re-applied and reverified directly against the live
+HTML (`curl`), not just the deploy log, for all four hosting targets
+before trusting it. **Lesson: when cleaning up test/scratch changes to a
+file via `git checkout`, check first whether that same file also holds
+real, wanted, not-yet-committed edits — `git checkout` can't distinguish
+between the two, it reverts everything uncommitted in that file.**
+
 ## Known limitations (deliberate, not oversights)
 
 - **Slots are fixed at Lunch/Dinner** (`SLOTS` in `core.js`) — unlike

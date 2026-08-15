@@ -315,11 +315,18 @@ function addFirebaseJsonHosting(opts) {
     return false;
   }
 
-  // Clone the first entry's exact formatting as a template, swapping only "target".
+  // Clone the first entry's exact formatting as a template, swapping the
+  // "target" field AND the patch-html-meta.js predeploy step's hostname
+  // argument — the latter is easy to miss (it's just a shell command
+  // string, not structured JSON), and leaving it as the template entry's
+  // own hostname would silently give the new venue's link previews/tab
+  // title/favicon the WRONG venue's branding instead of its own.
   const firstBraceRel = arrInner.indexOf("{");
   const firstCloseRel = findMatchingBracket(arrInner, firstBraceRel, "{", "}");
   const templateEntry = arrInner.slice(firstBraceRel, firstCloseRel + 1);
-  const newEntry = templateEntry.replace(/"target":\s*"[^"]+"/, `"target": ${JSON.stringify(opts.target)}`);
+  const newEntry = templateEntry
+    .replace(/"target":\s*"[^"]+"/, `"target": ${JSON.stringify(opts.target)}`)
+    .replace(/patch-html-meta\.js [^"]+"/, `patch-html-meta.js ${opts.host}"`);
 
   const insertText = `,\n    ${newEntry}`;
   const updated = insertBeforeClose(src, arrCloseIdx, insertText);
