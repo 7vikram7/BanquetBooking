@@ -449,10 +449,7 @@ entry unless one already exists for it.
 originating booking/enquiry's own `id`) precisely so the backfill can
 tell "already logged" apart from "never logged" and skip the former —
 verified directly by revisiting the Directory tab twice in one session
-and confirming the row count didn't double. `directoryBackfillDone` (a
-module-level flag) additionally limits this to once per page load rather
-than re-scanning on every single tab switch within the same session,
-though the `sourceId` check alone would already make repeat runs safe.
+and confirming the row count didn't double.
 
 **Deliberately does NOT skip a record for having a blank customerName/
 phone/eventType** — filtering incomplete records out of the backfill
@@ -462,6 +459,41 @@ prevent. Verified with a record that had empty `customerName`/`phone`
 written directly to `EnquiriesStore` (simulating genuinely old or
 incomplete real data) — confirmed it gets backfilled into the directory
 like any other record, not silently dropped.
+
+**Third real bug, reported after the backfill fix shipped: "the
+directory is still empty, it shows a blank page with just the date
+range and download Excel button"** — this one turned out NOT to be a
+display bug at all, and disproved the previous paragraph's claim that a
+plain `directoryBackfillDone` boolean flag was safe. Investigated
+directly against live production Firestore (rules are fully open, so a
+plain unauthenticated `curl` against the Firestore REST API can read/
+write `banquet_kv` for diagnosis) rather than guessing from the UI
+symptom, since two previous "fixes" for this same user complaint had
+each been real but incomplete. Found the real underlying enquiry/booking
+records were fine, but the `banquet:directory:*` documents contained up
+to 8 near-duplicate entries per record (same `sourceId`, `loggedAt`
+timestamps a few milliseconds apart) — a race condition, not a blank
+page: `directoryBackfillDone` was a plain boolean set `true` only after
+the *entire* async scan-and-write finished, so clicking (or a page
+re-render triggering) the Directory tab again before that first pass's
+Firestore round-trips completed started a second, fully independent
+scan that had no way to see the first scan's in-flight writes — both
+then wrote their own directory entry for the same booking/enquiry.
+Fixed in `directory-ui.js` by caching the in-flight *promise*
+(`directoryBackfillPromise`) instead of a completion boolean, so every
+concurrent caller of `ensureDirectoryBackfilled()` awaits the exact same
+underlying run rather than each starting its own; the backfill loop also
+now updates its `alreadyLogged` Set immediately after each write (not
+only once, up front, from pre-existing entries) as defense in depth
+against the same `sourceId` being processed twice within a single run
+for any other reason. Verified with a dedicated test firing 5 concurrent
+`renderDirectoryList()` calls via `Promise.all()` against one
+pre-existing (un-backfilled) enquiry — confirmed exactly 1 directory
+entry results, where the old code could produce up to 5. The duplicate
+data already written to production by the old code (banquet-74423 only)
+was cleaned up with a one-off script that GETs each affected
+`banquet:directory:YYYY-MM` document, dedupes its entries by
+`sourceId`/`id`, and PATCHes back only the `value` field.
 
 ## Security model — real Firebase Auth, two fixed role accounts
 

@@ -62,10 +62,26 @@ function directoryDateRange() {
 // problem this whole feature exists to avoid.
 const DIRECTORY_BACKFILL_YEARS_BACK = 15;
 const DIRECTORY_BACKFILL_YEARS_FORWARD = 5;
-let directoryBackfillDone = false;
+// Caches the IN-FLIGHT promise, not just a "done" boolean — a real bug
+// (caught in production, not anticipated) with a plain boolean flag: it's
+// only set true at the very end, so calling this again before the first
+// call finishes (e.g. clicking the Directory tab a couple of times while
+// the first click's Firestore round-trip is still in progress) sees
+// "not done yet" and starts a fully independent second scan, unaware of
+// the first one's in-flight writes — both then add their own directory
+// entry for the same enquiry, since neither sees the other's write.
+// Caching the promise means every caller, however many times this is
+// invoked concurrently, awaits the exact same run.
+let directoryBackfillPromise = null;
 
 async function ensureDirectoryBackfilled() {
-  if (directoryBackfillDone) return;
+  if (!directoryBackfillPromise) {
+    directoryBackfillPromise = runDirectoryBackfill();
+  }
+  return directoryBackfillPromise;
+}
+
+async function runDirectoryBackfill() {
   const today = new Date();
   const from = isoDate(new Date(today.getFullYear() - DIRECTORY_BACKFILL_YEARS_BACK, today.getMonth(), today.getDate()));
   const to = isoDate(new Date(today.getFullYear() + DIRECTORY_BACKFILL_YEARS_FORWARD, today.getMonth(), today.getDate()));
@@ -75,10 +91,15 @@ async function ensureDirectoryBackfilled() {
     EnquiriesStore.getRange(from, to),
     BookingsStore.getRange(from, to),
   ]);
+  // A Set that gets updated AS records are processed (not just seeded once
+  // from existingEntries) — defense in depth against the same sourceId
+  // ever appearing twice in one run, from any cause, not just the
+  // concurrent-call race this was written to fix.
   const alreadyLogged = new Set(existingEntries.map((e) => e.sourceId).filter(Boolean));
 
   for (const enq of enquiries) {
     if (alreadyLogged.has(enq.id)) continue;
+    alreadyLogged.add(enq.id);
     await addDirectoryEntry({
       date: enq.date,
       customerName: enq.customerName,
@@ -90,6 +111,7 @@ async function ensureDirectoryBackfilled() {
   }
   for (const bk of bookings) {
     if (alreadyLogged.has(bk.id)) continue;
+    alreadyLogged.add(bk.id);
     await addDirectoryEntry({
       date: bk.date,
       customerName: bk.customerName,
@@ -99,7 +121,6 @@ async function ensureDirectoryBackfilled() {
       sourceId: bk.id,
     });
   }
-  directoryBackfillDone = true;
 }
 
 async function directoryEntriesInRange() {
