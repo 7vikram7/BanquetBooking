@@ -410,6 +410,21 @@ possibly-concurrent writes from different devices, which this
 Firestore-as-KV-store setup has no transaction support for anyway),
 scoped to the tab's own From/To range.
 
+**Explicit Search button, not auto-load.** `ensureDirectoryBackfilled()`
+scans a much wider window than the visible list
+(`DIRECTORY_BACKFILL_YEARS_BACK/FORWARD` = 15/5 years) against
+Firestore — doing that on every tab switch or date-input change (the
+original behavior) meant an expensive scan on nearly every click
+anywhere near the tab. `initDirectoryTab()` no longer wires `change`
+listeners on the From/To inputs, and `directory` was removed from
+`TAB_RENDERERS` in `init.js` (so opening the tab, or any
+`refreshCurrentTab()` elsewhere in the app while it happens to be the
+active tab, no longer triggers it either) — the list only loads when
+the owner presses the dedicated Search button next to the date range.
+The container shows a "press Search to load entries" placeholder until
+then. Download Excel is unaffected — it already reads the current
+From/To values directly and can be used without pressing Search first.
+
 **Real bug: the tab looked broken because of its default date range, not
 because entries weren't being logged.** The first version copied
 Accounts' "default to the current month" pattern (`initDirectoryTab()`
@@ -494,6 +509,42 @@ data already written to production by the old code (banquet-74423 only)
 was cleaned up with a one-off script that GETs each affected
 `banquet:directory:YYYY-MM` document, dedupes its entries by
 `sourceId`/`id`, and PATCHes back only the `value` field.
+
+## Booking modal's bottom Save button closes the form; other saves don't
+
+`saveBooking()` (`bookings-ui.js`) is shared by three different UI
+triggers, and only one of them should close `modal-booking`:
+
+- **`bk-save-btn`** — the actual Save button at the very bottom of the
+  form, below Advances/Menu/Final Settlement. This is the "I'm done"
+  action, so it should close the form on success, same as the (much
+  shorter) enquiry modal already did — `saveEnquiry()` has always closed
+  `modal-enquiry` unconditionally on success since it has exactly one
+  caller.
+- **`addPaymentToDraft()`'s "Confirm"** on an advance — deliberately
+  calls `saveBooking()` too (see its own comment: confirming an advance
+  persists the whole booking on its own, no separate tap on the main
+  Save needed), but the owner/staff member is very likely about to keep
+  editing the same booking (record another advance, open the menu
+  editor, etc.) — closing here would kick them out mid-edit.
+- **the menu editor's "Done" button** — closes `modal-menu` and calls
+  `saveBooking()` to persist the menu, but leaves `modal-booking` (which
+  was underneath the whole time) open for the same reason.
+
+Since `saveBooking()` itself is the shared save/validate logic, closing
+the modal can't live inside it without wrongly closing it for the other
+two callers. Instead `saveBooking()` returns `true`/`false` (validation
+failures — the settlement-guard and required-fields checks — return
+`false`, success returns `true`), and only the dedicated
+`handleBookingSaveClick()` wrapper (wired to `bk-save-btn`'s click, in
+place of `saveBooking` directly) checks that return value and calls
+`closeModal("modal-booking")`. `addPaymentToDraft()` and the menu
+editor's "Done" handler still call `saveBooking()` directly and ignore
+its return value, exactly as before. Verified with a Playwright script
+that: clicks the bottom Save on a freshly reopened booking and confirms
+`modal-booking` gets the `hidden` class; separately reopens the same
+booking, confirms an advance, and confirms the modal is *still* visible
+afterward.
 
 ## Security model — real Firebase Auth, two fixed role accounts
 

@@ -32,9 +32,16 @@ function initDirectoryTab() {
   fromInput.value = from;
   toInput.value = to;
 
-  fromInput.addEventListener("change", renderDirectoryList);
-  toInput.addEventListener("change", renderDirectoryList);
+  // Deliberately no auto-load on tab open or date change — the backfill
+  // this triggers scans a much wider window than the visible list
+  // (DIRECTORY_BACKFILL_YEARS_BACK/FORWARD, 15/5 years) and can touch a
+  // lot of Firestore data, so it only runs when the owner explicitly asks
+  // for it via Search rather than on every tab switch.
+  document.getElementById("dir-search-btn").addEventListener("click", renderDirectoryList);
   document.getElementById("dir-download-excel-btn").addEventListener("click", generateDirectoryExcel);
+
+  document.getElementById("directory-list").innerHTML =
+    '<div class="simple-list-empty">Choose a date range and press Search to load entries.</div>';
 }
 
 function directoryDateRange() {

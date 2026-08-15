@@ -12,7 +12,7 @@ function initBookingModal() {
     syncEventTypeOtherWrap("bk-event-type", "bk-event-type-other-wrap");
   });
 
-  document.getElementById("bk-save-btn").addEventListener("click", saveBooking);
+  document.getElementById("bk-save-btn").addEventListener("click", handleBookingSaveClick);
   document.getElementById("bk-delete-btn").addEventListener("click", deleteBookingHandler);
   document.getElementById("bk-add-payment-btn").addEventListener("click", addPaymentToDraft);
   wireCallButton("bk-phone", "bk-call-btn");
@@ -563,7 +563,7 @@ async function saveBooking() {
   if (settlementWasAlreadyRecorded && !hasRole("owner")) {
     errEl.textContent = "This event is settled — only the owner can make changes.";
     errEl.classList.add("show");
-    return;
+    return false;
   }
 
   const data = readBookingForm();
@@ -572,7 +572,7 @@ async function saveBooking() {
   if (missing.length) {
     errEl.textContent = `Please fill in the required fields: ${missing.join(", ")}.`;
     errEl.classList.add("show");
-    return;
+    return false;
   }
 
   // No-ops for anything that isn't a genuinely new custom value — see
@@ -628,6 +628,17 @@ async function saveBooking() {
   document.getElementById("bk-confirmation-btn").classList.toggle("hidden", !stillConfirmed);
   document.getElementById("bk-confirmation-share-btn").classList.toggle("hidden", !stillConfirmed);
   await refreshCurrentTab();
+  return true;
+}
+
+// The Save button at the bottom of the form is the only saveBooking()
+// caller that should close the modal — addPaymentToDraft() and the menu
+// editor's "Done" button also call saveBooking() to persist in-progress
+// changes without leaving the (long, multi-section) form, so closing has
+// to live here rather than inside saveBooking() itself.
+async function handleBookingSaveClick() {
+  const ok = await saveBooking();
+  if (ok) closeModal("modal-booking");
 }
 
 async function deleteBookingHandler() {
