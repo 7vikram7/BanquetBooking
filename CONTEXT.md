@@ -285,6 +285,20 @@ replaced with read-only `<strong>` displays that just show
 the *historical* `draftSettlement.settledBy` — who actually settled it,
 not whoever happens to be viewing it now).
 
+**The advance's own date (`bk-payment-date`) is separate from `receivedBy`
+and stays a plain editable date input** — it defaults to today
+(`openBookingModal()` resets it to `todayIso()` every time the modal
+opens, whether for a new or an existing booking), but staff can change it
+to backdate an advance that was actually collected earlier and is only
+being entered now. Printed on the Booking Confirmation PDF
+(`generateBookingConfirmationPdf()`) right after who received it — "Rs.
+5,000 — received by Ramesh on 03/08/2026" — using the same compact
+`formatDateDDMMYYYY()` this file already uses for its other PDF dates
+(deliberately not the verbose `formatDateHuman()` used elsewhere in the
+app, to keep this itemized line short). The Event Summary PDF already
+printed this date per advance (`formatDateHuman(p.date)` there); only the
+Booking Confirmation PDF's advance line was missing it.
+
 **Phone number normalization matters more here than it first looks.**
 `normalizePhone()` (`core.js`) strips non-digits AND drops a leading
 India country code (`91`) when the remainder is still a plausible

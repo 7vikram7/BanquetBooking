@@ -1201,7 +1201,7 @@ async function generateBookingConfirmationPdf(ev, mode = "download") {
       y += lineHeight;
       for (const p of draftPayments) {
         ensureSpace(lineHeight);
-        doc.text(`   ${formatMoneyForPdf(p.amount)} — received by ${p.receivedBy || "—"}`, margin, y);
+        doc.text(`   ${formatMoneyForPdf(p.amount)} — received by ${p.receivedBy || "—"} on ${formatDateDDMMYYYY(p.date)}`, margin, y);
         y += lineHeight;
       }
       ensureSpace(lineHeight);
