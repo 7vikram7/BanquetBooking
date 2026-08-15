@@ -4,30 +4,44 @@
 // Settings > Data Deletion clearing out bookings/enquiries in the same
 // date range.
 
+// A directory entry's "date" is the EVENT date, not when it was logged —
+// a brand-new enquiry is very often for an event months away, so
+// defaulting this tab to "current month" (the pattern Accounts uses,
+// where it's correct — a sale can't be in the future) hid almost every
+// fresh entry by default. Real bug, not a hypothetical: verified directly
+// against DirectoryStore that entries WERE being logged correctly; the
+// tab just wasn't showing them. Wide fixed window instead — covers
+// realistic advance-booking lead time (a banquet hall doesn't usually
+// take bookings more than a couple years out) plus past history, without
+// being literally unbounded.
+const DIRECTORY_DEFAULT_YEARS_BACK = 2;
+const DIRECTORY_DEFAULT_YEARS_FORWARD = 2;
+
+function directoryDefaultRange() {
+  const today = new Date();
+  const from = isoDate(new Date(today.getFullYear() - DIRECTORY_DEFAULT_YEARS_BACK, today.getMonth(), today.getDate()));
+  const to = isoDate(new Date(today.getFullYear() + DIRECTORY_DEFAULT_YEARS_FORWARD, today.getMonth(), today.getDate()));
+  return { from, to };
+}
+
 function initDirectoryTab() {
   const fromInput = document.getElementById("dir-filter-from");
   const toInput = document.getElementById("dir-filter-to");
 
-  // Same "current month by default, but fully visible/adjustable" pattern
-  // as Accounts — see accounts-ui.js's initAccountsTab().
-  const today = new Date();
-  fromInput.value = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
-  toInput.value = isoDate(today);
+  const { from, to } = directoryDefaultRange();
+  fromInput.value = from;
+  toInput.value = to;
 
   fromInput.addEventListener("change", renderDirectoryList);
   toInput.addEventListener("change", renderDirectoryList);
   document.getElementById("dir-download-excel-btn").addEventListener("click", generateDirectoryExcel);
 }
 
-// Unlike Accounts' date range (which caps "To" at today, since a sale
-// can't be in the future), the Directory legitimately wants to show
-// enquiries logged FOR a future event date — so no upper cap here.
 function directoryDateRange() {
   const fromVal = document.getElementById("dir-filter-from").value;
   const toVal = document.getElementById("dir-filter-to").value;
-  const today = new Date();
-  const defaultFromIso = isoDate(new Date(today.getFullYear(), today.getMonth(), 1));
-  return { from: fromVal || defaultFromIso, to: toVal || isoDate(today) };
+  const defaults = directoryDefaultRange();
+  return { from: fromVal || defaults.from, to: toVal || defaults.to };
 }
 
 async function directoryEntriesInRange() {

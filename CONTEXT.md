@@ -408,11 +408,26 @@ entry (Sr No computed as position in the sorted list, not a stored
 counter — avoids needing an atomic global counter across
 possibly-concurrent writes from different devices, which this
 Firestore-as-KV-store setup has no transaction support for anyway),
-scoped to the tab's own From/To range. Unlike Accounts' date range (which
-caps "To" at today, since a sale can't be in the future),
-`directoryDateRange()` deliberately has no upper cap — an enquiry logged
-today FOR a future event date is exactly the kind of forward-looking
-entry this tab exists to surface.
+scoped to the tab's own From/To range.
+
+**Real bug: the tab looked broken because of its default date range, not
+because entries weren't being logged.** The first version copied
+Accounts' "default to the current month" pattern (`initDirectoryTab()`
+pre-filling From/To). That's correct FOR Accounts (a sale can't be in the
+future). It's wrong here: a directory entry's `date` is the EVENT date,
+and a fresh enquiry is very often for an event months away — so the
+current-month default hid almost every real entry, immediately after
+creating it, with no error or empty-state explanation pointing at the
+date filter as the cause. Reported as "Directory isn't working"; verified
+directly against `DirectoryStore` first (entries WERE there) before
+touching the UI, which is what pinned it on the date range rather than
+the write path. Fixed with a fixed, wide default window
+(`directoryDefaultRange()`: 2 years back to 2 years forward from today)
+instead of current-month — covers realistic advance-booking lead time
+plus past history without being fully unbounded. `directoryDateRange()`
+(used by both the list render and the Excel export) falls back to this
+same wide default if the From/To inputs are ever cleared, consistent
+with how Accounts falls back to its own (correctly narrow) default.
 
 ## Security model — real Firebase Auth, two fixed role accounts
 
