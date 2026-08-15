@@ -338,6 +338,82 @@ removing a staff member, and confirming a real `addPaymentToDraft()` call
 auto-signs the currently logged-in staff member's name with no manual
 input at all.
 
+**"admin" as an explicit owner-login keyword**: `handleLogin()`'s mobile-
+number field means owner login when either left blank OR set to the
+literal string `"admin"` (case-insensitive) — `isOwnerAttempt = !phone ||
+phone.toLowerCase() === "admin"`. This is purely a discoverability nicety
+on top of the existing blank-field behavior, not a separate mechanism —
+"admin" never touches any stored credential named that; it's just a
+second spelling of "leave this blank."
+
+## Custom event types + a permanent customer Directory
+
+Two related but distinct features, both from the same request, easy to
+conflate because both use the word "directory":
+
+**Custom event types** (`core.js`): `EVENT_TYPES` is now the *fixed base*
+list only — `"Other"` isn't in it anymore, and `allEventTypes()` always
+appends it last (`[...EVENT_TYPES, ...customEventTypes, "Other"]`), so it
+stays the bottom catch-all no matter how many custom types accumulate.
+Selecting "Other" in either the enquiry or booking form reveals a
+"Custom event type" text input (`syncEventTypeOtherWrap()`, wired to both
+selects' `change` event); if something is typed there at save time,
+`readEnquiryForm()`/`readBookingForm()` use THAT as the record's real
+`eventType` — the literal string `"Other"` is never actually saved once a
+custom name was given — and `registerCustomEventType()` persists it into
+`window.appSettings.customEventTypes` (case-insensitive deduped against
+both the fixed list and already-registered custom ones) so it becomes a
+normal selectable option in every future enquiry/booking, in both forms,
+not just remembered for this one record. Both modals' open functions
+*repopulate* the select (not just re-read stale options) specifically so
+a type registered since this tab/device last loaded actually shows up,
+plus `ensureEventTypeOption()` as a defensive fallback (same pattern as
+the legacy "tentative"/"converted" status re-injection elsewhere in this
+file) for the case where even that hasn't caught up yet.
+
+**Directory tab** (`directory-ui.js`, new file; `DirectoryStore` in
+`data-store.js`): an owner-only, append-only permanent log — every new
+enquiry AND every new booking (not just ones converted from an enquiry;
+bookings can be created directly) writes one entry via the shared
+`addDirectoryEntry({date, customerName, phone, eventType, source})`
+helper, in *addition* to whatever happens to its own normal
+BookingsStore/EnquiriesStore record. `date` here is the event/occasion
+date (this app's existing meaning of "date" on a booking/enquiry
+record), and `source` is `"Enquiry"` or `"Booking"` — a converted
+enquiry legitimately produces two directory entries (one from when it
+was first enquired, one from when it became a booking), which is
+intentional: they can carry different dates/event types if the
+customer's plans changed in between, so both are worth keeping as a full
+contact history rather than deduplicating them away.
+
+**The entire point is that this store is never wired into deletion.**
+`DirectoryStore` is built with the exact same `createDateBucketStore()`
+helper as `BookingsStore`/`EnquiriesStore` (so it gets `getRange()` for
+free, same querying convention as everywhere else) — which technically
+gives it a working `deleteRange()`/`deleteRecord()` too, since that
+helper always returns full CRUD. Nothing in this codebase calls those on
+`DirectoryStore`, and settings-ui.js's Data Deletion feature only ever
+touches `BookingsStore`/`EnquiriesStore` — verified directly: a real test
+run added a directory entry, then ran an actual Data Deletion sweep
+covering that same date range (confirmed for real via
+`EnquiriesStore.getRange()`/`BookingsStore.getRange()` both coming back
+empty afterward), and the directory row count was unchanged before and
+after. If a future change ever needs to purge directory data, that must
+be a new, deliberate, explicitly-requested feature — never a side effect
+of Data Deletion gaining one more store to sweep.
+
+Excel export (`generateDirectoryExcel()`) is the same lazy-loaded-SheetJS
+pattern as `generateAccountsExcel()` in `accounts-ui.js` — one row per
+entry (Sr No computed as position in the sorted list, not a stored
+counter — avoids needing an atomic global counter across
+possibly-concurrent writes from different devices, which this
+Firestore-as-KV-store setup has no transaction support for anyway),
+scoped to the tab's own From/To range. Unlike Accounts' date range (which
+caps "To" at today, since a sale can't be in the future),
+`directoryDateRange()` deliberately has no upper cap — an enquiry logged
+today FOR a future event date is exactly the kind of forward-looking
+entry this tab exists to surface.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

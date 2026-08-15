@@ -26,8 +26,8 @@
     </div>
 
     <div id="login-normal-block" class="hidden">
-      <label>Mobile number <span class="muted">(staff only — leave blank if you're the owner)</span></label>
-      <input type="tel" id="login-phone" autocomplete="tel" />
+      <label>Mobile number <span class="muted">(staff — or type "admin" / leave blank if you're the owner)</span></label>
+      <input type="text" id="login-phone" autocomplete="off" placeholder="Mobile number or admin" />
       <label>Password</label>
       <input type="password" id="login-password" autocomplete="current-password" />
       <div class="modal-error" id="login-error"></div>
@@ -56,6 +56,7 @@
     <button class="tab-btn active" data-tab="calendar">Calendar</button>
     <button class="tab-btn hidden" data-tab="dashboard" data-owner-only>Dashboard</button>
     <button class="tab-btn hidden" data-tab="accounts" data-owner-only>Accounts</button>
+    <button class="tab-btn hidden" data-tab="directory" data-owner-only>Directory</button>
     <button class="tab-btn hidden" data-tab="settings" data-owner-only>Settings</button>
   </nav>
 
@@ -112,6 +113,17 @@
       </div>
       <div id="accounts-summary" class="acct-summary"></div>
       <div id="accounts-list" class="acct-list"></div>
+    </section>
+
+    <!-- -------------------- DIRECTORY -------------------- -->
+    <section id="tab-directory" class="tab-panel">
+      <p class="muted">A permanent log of every enquiry and booking ever made — kept intact even if matching bookings/enquiries are later removed via Settings &gt; Data Deletion.</p>
+      <div class="filter-row">
+        <label class="inline-label">From <input type="date" id="dir-filter-from" /></label>
+        <label class="inline-label">To <input type="date" id="dir-filter-to" /></label>
+        <button class="btn btn-sm" id="dir-download-excel-btn" type="button">Download Excel</button>
+      </div>
+      <div id="directory-list" class="acct-list"></div>
     </section>
 
     <!-- -------------------- SETTINGS -------------------- -->
@@ -217,6 +229,7 @@
         <option value="dinner">Dinner</option>
       </select></label>
       <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="enq-event-type"></select></label>
+      <label id="enq-event-type-other-wrap" class="hidden">Custom event type <input type="text" id="enq-event-type-other" placeholder="e.g. Mundan Ceremony" /></label>
       <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="enq-customer" /></label>
       <label><span class="label-text">Phone<span class="required-star">*</span></span>
         <div class="field-with-action">
@@ -259,6 +272,7 @@
         <option value="dinner">Dinner</option>
       </select></label>
       <label><span class="label-text">Event type<span class="required-star">*</span></span> <select id="bk-event-type"></select></label>
+      <label id="bk-event-type-other-wrap" class="hidden">Custom event type <input type="text" id="bk-event-type-other" placeholder="e.g. Mundan Ceremony" /></label>
       <label><span class="label-text">Customer name<span class="required-star">*</span></span> <input type="text" id="bk-customer" /></label>
       <label><span class="label-text">Phone<span class="required-star">*</span></span>
         <div class="field-with-action">
@@ -394,6 +408,7 @@
 <script src="js/enquiries-ui.js"></script>
 <script src="js/bookings-ui.js"></script>
 <script src="js/accounts-ui.js"></script>
+<script src="js/directory-ui.js"></script>
 <script src="js/settings-ui.js"></script>
 <script src="js/init.js"></script>
 </body>

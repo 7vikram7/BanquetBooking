@@ -7,6 +7,7 @@ const TAB_RENDERERS = {
   calendar: renderCalendar,
   dashboard: renderDashboard,
   accounts: renderAccountsList,
+  directory: renderDirectoryList,
   settings: async () => { renderSettingsHalls(); renderSettingsStaff(); },
 };
 
@@ -78,6 +79,7 @@ async function onAuthSuccess() {
   initBookingModal();
   initDashboardSummary();
   initAccountsTab();
+  initDirectoryTab();
   initSettingsTab();
 
   switchTab("calendar");

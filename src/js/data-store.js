@@ -87,6 +87,7 @@ async function getSettings() {
     ownerHash: null,
     staffHash: null,
     staffMembers: [],
+    customEventTypes: [],
     ...(s || {}),
   };
 }
@@ -241,3 +242,34 @@ function createDateBucketStore(name) {
 
 const BookingsStore = createDateBucketStore("bookings");
 const EnquiriesStore = createDateBucketStore("enquiries");
+
+// A permanent, append-only customer contact log — every new enquiry AND
+// every new booking (bookings aren't always converted from an enquiry
+// first) adds one entry here, in addition to whatever happens to its own
+// BookingsStore/EnquiriesStore record. Deliberately built the same
+// date-bucketed way as those two stores (so it gets getRange() for free,
+// same querying convention as everywhere else in this app) — but
+// settings-ui.js's Data Deletion feature must NEVER be wired to touch
+// this store, by design: "keep this directory intact" even when
+// bookings/enquiries within the same range are permanently deleted. If a
+// future change ever needs to purge directory data, that has to be a
+// deliberate, separate, explicitly-requested feature — not a side effect
+// of the existing delete-range tool gaining one more store to sweep.
+const DirectoryStore = createDateBucketStore("directory");
+
+// Shared by saveEnquiry()/saveBooking() (see enquiries-ui.js/bookings-ui.js)
+// so both feed the same permanent log the same way. `date` here is the
+// event/occasion date (this app's existing meaning of "date" on an
+// enquiry or booking record), not when the entry was logged — `loggedAt`
+// separately captures that, in case the two ever need to be told apart.
+async function addDirectoryEntry({ date, customerName, phone, eventType, source }) {
+  await DirectoryStore.addRecord({
+    id: uid("dir"),
+    date,
+    customerName,
+    phone,
+    eventType,
+    source,
+    loggedAt: new Date().toISOString(),
+  });
+}

@@ -7,7 +7,10 @@
 function initBookingModal() {
   const halls = window.appSettings.halls;
   populateSelect(document.getElementById("bk-hall"), halls);
-  populateSelect(document.getElementById("bk-event-type"), EVENT_TYPES.map((t) => ({ id: t, name: t })));
+  populateSelect(document.getElementById("bk-event-type"), allEventTypes().map((t) => ({ id: t, name: t })));
+  document.getElementById("bk-event-type").addEventListener("change", () => {
+    syncEventTypeOtherWrap("bk-event-type", "bk-event-type-other-wrap");
+  });
 
   document.getElementById("bk-save-btn").addEventListener("click", saveBooking);
   document.getElementById("bk-delete-btn").addEventListener("click", deleteBookingHandler);
@@ -85,7 +88,16 @@ function openBookingModal(booking, prefill) {
   document.getElementById("bk-date").value = booking?.date || enquiry?.date || prefill?.date || todayIso();
   document.getElementById("bk-hall").value = booking?.hallId || enquiry?.hallId || prefill?.hallId || window.appSettings.halls[0].id;
   document.getElementById("bk-slot").value = booking?.slot || enquiry?.slot || prefill?.slotId || "lunch";
-  document.getElementById("bk-event-type").value = booking?.eventType || enquiry?.eventType || EVENT_TYPES[0];
+  // Repopulate (not just re-read) — see openEnquiryModal()'s identical
+  // comment for why: a custom type added since this app last loaded
+  // otherwise wouldn't be a selectable option yet.
+  const eventTypeToShow = booking?.eventType || enquiry?.eventType || EVENT_TYPES[0];
+  const eventTypeSelect = document.getElementById("bk-event-type");
+  populateSelect(eventTypeSelect, allEventTypes().map((t) => ({ id: t, name: t })));
+  ensureEventTypeOption(eventTypeSelect, eventTypeToShow);
+  eventTypeSelect.value = eventTypeToShow;
+  document.getElementById("bk-event-type-other").value = "";
+  syncEventTypeOtherWrap("bk-event-type", "bk-event-type-other-wrap");
   document.getElementById("bk-customer").value = booking?.customerName || enquiry?.customerName || "";
   document.getElementById("bk-phone").value = booking?.phone || enquiry?.phone || "";
   document.getElementById("bk-email").value = booking?.email || enquiry?.email || "";
@@ -313,11 +325,16 @@ function updateBalanceDisplay() {
 }
 
 function readBookingForm() {
+  // "Other" + a typed custom value means the custom text IS the real
+  // event type from here on — same rule as the enquiry form.
+  const eventTypeSelect = document.getElementById("bk-event-type");
+  const customEventType = document.getElementById("bk-event-type-other").value.trim();
+  const eventType = eventTypeSelect.value === "Other" && customEventType ? customEventType : eventTypeSelect.value;
   return {
     date: document.getElementById("bk-date").value,
     hallId: document.getElementById("bk-hall").value,
     slot: document.getElementById("bk-slot").value,
-    eventType: document.getElementById("bk-event-type").value,
+    eventType,
     customerName: document.getElementById("bk-customer").value.trim(),
     phone: document.getElementById("bk-phone").value.trim(),
     email: document.getElementById("bk-email").value.trim(),
@@ -558,6 +575,10 @@ async function saveBooking() {
     return;
   }
 
+  // No-ops for anything that isn't a genuinely new custom value — see
+  // registerCustomEventType() and readEnquiryForm()'s identical comment.
+  await registerCustomEventType(data.eventType);
+
   const id = document.getElementById("bk-id").value;
   let savedBooking;
   if (id) {
@@ -569,6 +590,18 @@ async function saveBooking() {
       createdAt: new Date().toISOString(),
       enquiryId: pendingEnquiryLink?.id || null,
       ...data,
+    });
+    // Logged even when this booking came from converting an enquiry
+    // (which already logged its own directory entry when IT was first
+    // created) — the two can end up with different dates/event types if
+    // the customer's plans changed between enquiring and actually
+    // booking, so both are worth keeping as a full contact history.
+    await addDirectoryEntry({
+      date: data.date,
+      customerName: data.customerName,
+      phone: data.phone,
+      eventType: data.eventType,
+      source: "Booking",
     });
     if (pendingEnquiryLink) {
       // No "converted" status — once an enquiry becomes a booking, the

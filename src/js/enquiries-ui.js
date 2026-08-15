@@ -6,7 +6,10 @@
 function initEnquiryModal() {
   const halls = window.appSettings.halls;
   populateSelect(document.getElementById("enq-hall"), halls);
-  populateSelect(document.getElementById("enq-event-type"), EVENT_TYPES.map((t) => ({ id: t, name: t })));
+  populateSelect(document.getElementById("enq-event-type"), allEventTypes().map((t) => ({ id: t, name: t })));
+  document.getElementById("enq-event-type").addEventListener("change", () => {
+    syncEventTypeOtherWrap("enq-event-type", "enq-event-type-other-wrap");
+  });
 
   document.getElementById("enq-save-btn").addEventListener("click", saveEnquiry);
   document.getElementById("enq-delete-btn").addEventListener("click", deleteEnquiryHandler);
@@ -26,7 +29,16 @@ function openEnquiryModal(enquiry, prefill) {
   document.getElementById("enq-date").value = enquiry?.date || prefill?.date || todayIso();
   document.getElementById("enq-hall").value = enquiry?.hallId || prefill?.hallId || window.appSettings.halls[0].id;
   document.getElementById("enq-slot").value = enquiry?.slot || prefill?.slotId || "lunch";
-  document.getElementById("enq-event-type").value = enquiry?.eventType || EVENT_TYPES[0];
+  // Repopulate (not just re-read) — a custom type added since this app
+  // last loaded needs to actually be in the list before .value can select
+  // it. ensureEventTypeOption() is still a defensive fallback on top —
+  // e.g. a type registered on another device/tab that hasn't synced here.
+  const eventTypeSelect = document.getElementById("enq-event-type");
+  populateSelect(eventTypeSelect, allEventTypes().map((t) => ({ id: t, name: t })));
+  ensureEventTypeOption(eventTypeSelect, enquiry?.eventType);
+  eventTypeSelect.value = enquiry?.eventType || EVENT_TYPES[0];
+  document.getElementById("enq-event-type-other").value = "";
+  syncEventTypeOtherWrap("enq-event-type", "enq-event-type-other-wrap");
   document.getElementById("enq-customer").value = enquiry?.customerName || "";
   document.getElementById("enq-phone").value = enquiry?.phone || "";
   document.getElementById("enq-email").value = enquiry?.email || "";
@@ -56,11 +68,17 @@ function openEnquiryModal(enquiry, prefill) {
 }
 
 function readEnquiryForm() {
+  // "Other" + a typed custom value means the custom text IS the real
+  // event type from here on — the record never stores the literal string
+  // "Other" once something more specific was actually typed in.
+  const eventTypeSelect = document.getElementById("enq-event-type");
+  const customEventType = document.getElementById("enq-event-type-other").value.trim();
+  const eventType = eventTypeSelect.value === "Other" && customEventType ? customEventType : eventTypeSelect.value;
   return {
     date: document.getElementById("enq-date").value,
     hallId: document.getElementById("enq-hall").value,
     slot: document.getElementById("enq-slot").value,
-    eventType: document.getElementById("enq-event-type").value,
+    eventType,
     customerName: document.getElementById("enq-customer").value.trim(),
     phone: document.getElementById("enq-phone").value.trim(),
     email: document.getElementById("enq-email").value.trim(),
@@ -83,6 +101,12 @@ async function saveEnquiry() {
     return;
   }
 
+  // Registering happens regardless of new-vs-edit and no-ops for anything
+  // that isn't a genuinely new custom value (see registerCustomEventType())
+  // — simplest to just always call it here rather than duplicate the
+  // "was this actually custom" check that function already does.
+  await registerCustomEventType(data.eventType);
+
   const id = document.getElementById("enq-id").value;
   if (id) {
     const origDate = document.getElementById("enq-orig-date").value;
@@ -92,6 +116,13 @@ async function saveEnquiry() {
       id: uid("enq"),
       createdAt: new Date().toISOString(),
       ...data,
+    });
+    await addDirectoryEntry({
+      date: data.date,
+      customerName: data.customerName,
+      phone: data.phone,
+      eventType: data.eventType,
+      source: "Enquiry",
     });
   }
   closeModal("modal-enquiry");

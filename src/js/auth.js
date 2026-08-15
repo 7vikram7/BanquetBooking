@@ -160,14 +160,18 @@ async function handleLogin(onSuccess) {
   const pw = e.loginPw.value;
   e.loginError.classList.remove("show");
 
-  // A mobile number means this is a staff login — each staff member has
-  // their own number + password (owner-managed, see Settings > Staff),
-  // not one shared password with no individual identity. This is purely
-  // the legacy-style client-side hash check (same soft-deterrent security
+  // Leaving this field blank OR typing the literal "admin" both mean
+  // owner login — "admin" is just a discoverable, explicit way to say
+  // "I'm the owner" instead of relying on knowing to leave it empty. Any
+  // other value means this is a staff login — each staff member has their
+  // own number + password (owner-managed, see Settings > Staff), not one
+  // shared password with no individual identity. This is purely the
+  // legacy-style client-side hash check (same soft-deterrent security
   // model as the rest of this app, see CONTEXT.md's Security section) —
   // there's no per-staff real Firebase Auth account, unlike the fixed
   // owner/staff accounts the dormant migration below still targets.
-  if (phone) {
+  const isOwnerAttempt = !phone || phone.toLowerCase() === "admin";
+  if (!isOwnerAttempt) {
     const staff = findStaffByPhone(cachedSettings.staffMembers, phone);
     const hash = staff ? await sha256Hex(pw) : null;
     if (!staff || hash !== staff.passwordHash) {

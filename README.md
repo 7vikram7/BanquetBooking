@@ -33,6 +33,9 @@ See [Onboarding a new venue](#onboarding-a-new-venue) to add one.
 - **Enquiries** — track leads before they're confirmed: status (new /
   follow-up / lost), follow-up date, prefills straight into a booking. A
   "Call" button beside the phone field opens the phone's dialer directly.
+  Selecting "Other" as the event type reveals a text field to name it —
+  that name is remembered as a normal selectable type from then on, in
+  both the enquiry and booking forms.
 - **Bookings** — guest count, computed pricing (per-plate cost x guests +
   hall rent + extra amount), a menu builder (12 fixed categories) with
   PDF export for the kitchen, advance payments with running balance,
@@ -44,15 +47,21 @@ See [Onboarding a new venue](#onboarding-a-new-venue) to add one.
 - **Accounts** (owner only) — a read-only sales ledger of past, settled
   events with a summary strip and per-event payment breakdown; supports
   Excel export.
+- **Directory** (owner only) — a permanent log of every enquiry and
+  booking ever made (name, phone, date, occasion), with its own date-range
+  Excel export. Deliberately untouched by Settings' Data Deletion — it's
+  the one thing that's never removable from the app.
 - **Settings** (owner only) — add/rename halls, add/edit/remove named
   staff members (name, mobile number, password), change the owner
   password, Firebase connection status.
-- **Roles** — owner logs in with just a password; each staff member logs
-  in with their own mobile number + password (owner-assigned in
-  Settings), unlocking Calendar/booking/enquiry entry only (Dashboard,
-  Accounts, Settings tabs stay hidden). Advances and settlements are
-  auto-signed with whoever's actually logged in — no manual "who recorded
-  this" entry anymore. Staff also loses all edit rights on a settled event.
+- **Roles** — owner logs in with just a password (or the word "admin" in
+  the mobile-number field, if that's more discoverable); each staff
+  member logs in with their own mobile number + password (owner-assigned
+  in Settings), unlocking Calendar/booking/enquiry entry only (Dashboard,
+  Accounts, Directory, Settings tabs stay hidden). Advances and
+  settlements are auto-signed with whoever's actually logged in — no
+  manual "who recorded this" entry anymore. Staff also loses all edit
+  rights on a settled event.
 
 ## Quick start (local, no Firebase needed)
 
@@ -139,8 +148,9 @@ src/
     bookings-ui.js                booking modal: pricing, menu/PDF, payments,
                                    settlement/GST, Event Summary PDF
     accounts-ui.js                 settled-events sales ledger + Excel export
-    settings-ui.js                  halls (add/rename), passwords, sync status
-    init.js                         bootstrap — MUST load last
+    directory-ui.js                 permanent customer log + Excel export
+    settings-ui.js                    halls, staff accounts, sync status
+    init.js                            bootstrap — MUST load last
 scripts/
   onboard-venue.js                 new-venue onboarding automation (see above)
   generate-onboarding-template.js  (re)generates the Excel template below

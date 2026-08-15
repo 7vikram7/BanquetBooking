@@ -141,6 +141,10 @@ const ENQUIRY_STATUSES = ["new", "followup", "lost"];
 // to some other color.
 const BOOKING_STATUSES = ["confirmed", "cancelled"];
 
+// "Other" is deliberately not in this fixed list — allEventTypes() always
+// appends it last, after any owner/staff-added custom types, so it stays
+// the catch-all at the bottom of the dropdown no matter how many custom
+// types accumulate.
 const EVENT_TYPES = [
   "Wedding",
   "Reception",
@@ -148,8 +152,53 @@ const EVENT_TYPES = [
   "Birthday",
   "Anniversary",
   "Corporate",
-  "Other",
 ];
+
+// Selecting "Other" in the enquiry/booking form reveals a text input; if
+// the customer's actual occasion is typed there, it's saved as a new
+// permanent option here (window.appSettings.customEventTypes) so it shows
+// up as a normal selectable type in every future enquiry/booking, in both
+// forms — not just remembered for this one record.
+function allEventTypes() {
+  const custom = (window.appSettings && window.appSettings.customEventTypes) || [];
+  return [...EVENT_TYPES, ...custom, "Other"];
+}
+
+// Registers a new custom event type (case-insensitive dedup against both
+// the fixed list and any already-registered custom ones) and persists it.
+// No-ops for a blank name or one that's just "Other" itself.
+async function registerCustomEventType(name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "other") return;
+  const existing = allEventTypes();
+  if (existing.some((t) => t.toLowerCase() === trimmed.toLowerCase())) return;
+  window.appSettings.customEventTypes = window.appSettings.customEventTypes || [];
+  window.appSettings.customEventTypes.push(trimmed);
+  await saveSettings(window.appSettings);
+}
+
+// Defensive safety net (same pattern as the legacy "tentative"/"converted"
+// status re-injection elsewhere in this app): a record's eventType might
+// not be in the <select>'s current option list — e.g. a custom type typed
+// in before appSettings.customEventTypes had synced on this device/tab.
+// Without this, setting .value to a missing option silently blanks the
+// select, and saving again would corrupt the record to an empty type.
+function ensureEventTypeOption(selectEl, eventType) {
+  if (!eventType) return;
+  if ([...selectEl.options].some((o) => o.value === eventType)) return;
+  const opt = document.createElement("option");
+  opt.value = eventType;
+  opt.textContent = eventType;
+  selectEl.insertBefore(opt, selectEl.firstChild);
+}
+
+// Shows/hides the "Custom event type" text input beside the Event type
+// <select> — shared by the enquiry and booking forms (just a different id
+// prefix each), so this only needs writing once.
+function syncEventTypeOtherWrap(selectId, wrapId) {
+  const isOther = document.getElementById(selectId).value === "Other";
+  document.getElementById(wrapId).classList.toggle("hidden", !isOther);
+}
 
 // Order here is display order everywhere: the menu modal's tabs and the
 // generated PDF both iterate this array directly.
