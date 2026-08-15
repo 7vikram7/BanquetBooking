@@ -44,11 +44,15 @@ See [Onboarding a new venue](#onboarding-a-new-venue) to add one.
 - **Accounts** (owner only) — a read-only sales ledger of past, settled
   events with a summary strip and per-event payment breakdown; supports
   Excel export.
-- **Settings** (owner only) — add/rename halls, set/change owner & staff
-  passwords, Firebase connection status.
-- **Roles** — owner password unlocks everything; staff password unlocks
-  Calendar/booking/enquiry entry only (Dashboard, Accounts, Settings tabs
-  stay hidden), and staff loses edit rights entirely on a settled event.
+- **Settings** (owner only) — add/rename halls, add/edit/remove named
+  staff members (name, mobile number, password), change the owner
+  password, Firebase connection status.
+- **Roles** — owner logs in with just a password; each staff member logs
+  in with their own mobile number + password (owner-assigned in
+  Settings), unlocking Calendar/booking/enquiry entry only (Dashboard,
+  Accounts, Settings tabs stay hidden). Advances and settlements are
+  auto-signed with whoever's actually logged in — no manual "who recorded
+  this" entry anymore. Staff also loses all edit rights on a settled event.
 
 ## Quick start (local, no Firebase needed)
 

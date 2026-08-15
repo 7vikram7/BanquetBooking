@@ -378,6 +378,31 @@ function wireCallButton(inputId, buttonId) {
   });
 }
 
+// Digits only (drops spaces/dashes/brackets/leading "+") so a mobile
+// number can be looked up consistently regardless of how it was typed in
+// at staff-creation time vs. login time — e.g. "+91 98765 43210" and
+// "9876543210" should match the same staff member.
+function normalizePhone(phone) {
+  let digits = (phone || "").replace(/\D/g, "");
+  // Drop a leading India country code (91) when the remainder is still a
+  // plausible 10-digit mobile number, so "+91 98765 43210" (however the
+  // owner happened to type it in when adding a staff member) and
+  // "9876543210" (however the staff member happens to type it in at
+  // login) normalize to the same value. Without this, a phone number
+  // entered two different-but-equivalent ways would neither be caught as
+  // a duplicate nor match at login.
+  if (digits.length === 12 && digits.startsWith("91")) {
+    digits = digits.slice(2);
+  }
+  return digits;
+}
+
+function findStaffByPhone(staffMembers, phone) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) return null;
+  return (staffMembers || []).find((s) => normalizePhone(s.phone) === normalized) || null;
+}
+
 // Shared required-field check for enquiry/booking forms (date, hall, slot,
 // event type, customer name, phone, guest count are all marked required in
 // the UI — hall/slot/event type are <select>s with no blank option, so they

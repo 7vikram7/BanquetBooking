@@ -391,6 +391,13 @@ input[type="number"]::-webkit-inner-spin-button {
 .hall-name-row { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem; }
 .hall-name-row label { flex-direction: row; align-items: center; min-width: 4.5rem; }
 
+.staff-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.staff-row input { flex: 1 1 150px; min-width: 0; }
+.staff-row button { flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .staff-row { flex-direction: column; align-items: stretch; }
+}
+
 /* ---------------- payments ---------------- */
 
 .payment-add-row { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); align-items: end; }

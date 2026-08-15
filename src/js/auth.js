@@ -13,6 +13,11 @@
 // See CONTEXT.md's Security section for the full reasoning.
 
 const ROLE_KEY = "banquet:role";
+// Set only when role === "staff" — which individual staff member is
+// logged in, since "staff" is no longer one shared identity (see
+// handleLogin()'s phone-based lookup). Not meaningful for role === "owner".
+const STAFF_NAME_KEY = "banquet:staffName";
+const STAFF_ID_KEY = "banquet:staffId";
 
 let cachedSettings = null;
 
@@ -28,8 +33,23 @@ function hasRole(required) {
   return role === required;
 }
 
+// The name to auto-sign onto advances/settlements recorded in this
+// session — "Owner" for the owner (who has no individual staff record),
+// or the logged-in staff member's own name. Never null while actually
+// logged in, since login only succeeds once a role is established.
+function currentStaffName() {
+  if (currentRole() === "owner") return "Owner";
+  return sessionStorage.getItem(STAFF_NAME_KEY) || "Staff";
+}
+
+function currentStaffId() {
+  return sessionStorage.getItem(STAFF_ID_KEY);
+}
+
 function logout() {
   sessionStorage.removeItem(ROLE_KEY);
+  sessionStorage.removeItem(STAFF_NAME_KEY);
+  sessionStorage.removeItem(STAFF_ID_KEY);
   if (window.firebaseReady) {
     firebase.auth().signOut().catch(() => {});
   }
@@ -45,6 +65,7 @@ function els() {
     setupOwnerPw2: document.getElementById("setup-owner-password-confirm"),
     setupBtn: document.getElementById("setup-owner-btn"),
     setupError: document.getElementById("setup-error"),
+    loginPhone: document.getElementById("login-phone"),
     loginPw: document.getElementById("login-password"),
     loginBtn: document.getElementById("login-btn"),
     loginError: document.getElementById("login-error"),
@@ -79,6 +100,9 @@ async function initAuth(onSuccess) {
   e.setupBlock.classList.add("hidden");
   e.loginBlock.classList.remove("hidden");
   e.loginBtn.addEventListener("click", () => handleLogin(onSuccess));
+  e.loginPhone.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter") handleLogin(onSuccess);
+  });
   e.loginPw.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter") handleLogin(onSuccess);
   });
@@ -132,33 +156,54 @@ async function handleSetupOwner(onSuccess) {
 
 async function handleLogin(onSuccess) {
   const e = els();
+  const phone = e.loginPhone.value.trim();
   const pw = e.loginPw.value;
   e.loginError.classList.remove("show");
 
-  // Real Firebase sign-in first — this is what Firestore access actually
-  // depends on once firestore.rules requires request.auth.
+  // A mobile number means this is a staff login — each staff member has
+  // their own number + password (owner-managed, see Settings > Staff),
+  // not one shared password with no individual identity. This is purely
+  // the legacy-style client-side hash check (same soft-deterrent security
+  // model as the rest of this app, see CONTEXT.md's Security section) —
+  // there's no per-staff real Firebase Auth account, unlike the fixed
+  // owner/staff accounts the dormant migration below still targets.
+  if (phone) {
+    const staff = findStaffByPhone(cachedSettings.staffMembers, phone);
+    const hash = staff ? await sha256Hex(pw) : null;
+    if (!staff || hash !== staff.passwordHash) {
+      e.loginError.textContent = "No staff member found with that mobile number, or incorrect password.";
+      e.loginError.classList.add("show");
+      e.loginPw.value = "";
+      return;
+    }
+    sessionStorage.setItem(ROLE_KEY, "staff");
+    sessionStorage.setItem(STAFF_NAME_KEY, staff.name);
+    sessionStorage.setItem(STAFF_ID_KEY, staff.id);
+    e.screen.classList.add("hidden");
+    onSuccess();
+    return;
+  }
+
+  // Blank mobile number = owner login. Real Firebase sign-in first — this
+  // is what Firestore access actually depends on once firestore.rules
+  // requires request.auth (not live yet — see CONTEXT.md — but harmless
+  // to keep trying).
   if (window.firebaseReady) {
-    for (const [email, role] of [[OWNER_EMAIL, "owner"], [STAFF_EMAIL, "staff"]]) {
-      try {
-        await firebase.auth().signInWithEmailAndPassword(email, pw);
-        sessionStorage.setItem(ROLE_KEY, role);
-        e.screen.classList.add("hidden");
-        onSuccess();
-        return;
-      } catch (err) {
-        // Wrong password for this role, or the account doesn't exist yet
-        // (pre-migration) — try the other role, then the legacy fallback.
-      }
+    try {
+      await firebase.auth().signInWithEmailAndPassword(OWNER_EMAIL, pw);
+      sessionStorage.setItem(ROLE_KEY, "owner");
+      e.screen.classList.add("hidden");
+      onSuccess();
+      return;
+    } catch (err) {
+      // Wrong password, or the account doesn't exist yet (pre-migration) —
+      // fall through to the legacy hash check below.
     }
   }
 
-  // Legacy fallback: pre-migration accounts only have a SHA-256 hash.
+  // Legacy fallback: pre-migration owner accounts only have a SHA-256 hash.
   const hash = await sha256Hex(pw);
-  let role = null;
-  if (cachedSettings.ownerHash && hash === cachedSettings.ownerHash) role = "owner";
-  else if (cachedSettings.staffHash && hash === cachedSettings.staffHash) role = "staff";
-
-  if (!role) {
+  if (!cachedSettings.ownerHash || hash !== cachedSettings.ownerHash) {
     e.loginError.textContent = "Incorrect password.";
     e.loginError.classList.add("show");
     e.loginPw.value = "";
@@ -170,20 +215,20 @@ async function handleLogin(onSuccess) {
       // Verifies the password against the legacy hash SERVER-SIDE (see
       // functions/index.js's claimAccount) before creating/updating the
       // Firebase Auth account — closes a real race condition where anyone
-      // could otherwise try to claim the fixed owner/staff email first,
-      // since those addresses are visible in the public client bundle.
+      // could otherwise try to claim the fixed owner email first, since
+      // it's visible in the public client bundle.
       const claimAccount = firebase.functions().httpsCallable("claimAccount");
-      await claimAccount({ role, password: pw });
-      await firebase.auth().signInWithEmailAndPassword(role === "owner" ? OWNER_EMAIL : STAFF_EMAIL, pw);
+      await claimAccount({ role: "owner", password: pw });
+      await firebase.auth().signInWithEmailAndPassword(OWNER_EMAIL, pw);
     } catch (err) {
       // Migration didn't complete this time (e.g. offline) — the legacy
       // check above already granted this session's access; it'll retry on
       // a future login. Firestore reads/writes may fail this session.
-      console.warn("[auth] could not migrate account to Firebase Auth this session", err);
+      console.warn("[auth] could not migrate owner account to Firebase Auth this session", err);
     }
   }
 
-  sessionStorage.setItem(ROLE_KEY, role);
+  sessionStorage.setItem(ROLE_KEY, "owner");
   e.screen.classList.add("hidden");
   onSuccess();
 }
@@ -195,5 +240,5 @@ function applyRoleVisibility() {
     el.classList.toggle("hidden", !owner);
   });
   const badge = document.getElementById("role-badge");
-  if (badge) badge.textContent = currentRole() === "owner" ? "Owner" : "Staff";
+  if (badge) badge.textContent = currentStaffName();
 }

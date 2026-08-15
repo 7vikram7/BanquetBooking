@@ -12,8 +12,31 @@ function renderSettingsHalls() {
   });
 }
 
+function renderSettingsStaff() {
+  const container = document.getElementById("settings-staff-list");
+  const staff = window.appSettings.staffMembers || [];
+  if (!staff.length) {
+    container.innerHTML = '<p class="muted">No staff members yet — add one below.</p>';
+    return;
+  }
+  container.innerHTML = "";
+  staff.forEach((member, idx) => {
+    const row = document.createElement("div");
+    row.className = "staff-row";
+    row.dataset.staffIdx = idx;
+    row.innerHTML = `
+      <input type="text" value="${escapeHtml(member.name)}" data-field="name" placeholder="Name" />
+      <input type="tel" value="${escapeHtml(member.phone)}" data-field="phone" placeholder="Mobile number" />
+      <input type="password" data-field="password" placeholder="New password (leave blank to keep)" autocomplete="new-password" />
+      <button class="btn btn-sm" type="button" data-remove-staff-idx="${idx}">Remove</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
 function initSettingsTab() {
   renderSettingsHalls();
+  renderSettingsStaff();
 
   document.getElementById("settings-save-halls").addEventListener("click", async () => {
     const inputs = document.querySelectorAll("#settings-halls input[data-hall-idx]");
@@ -37,42 +60,109 @@ function initSettingsTab() {
     refreshHallDependentUI();
   });
 
-  document.getElementById("settings-save-staff-pw").addEventListener("click", async () => {
-    const pwEl = document.getElementById("settings-staff-password");
+  document.getElementById("settings-save-staff-btn").addEventListener("click", async () => {
     const errEl = document.getElementById("settings-staff-error");
     errEl.classList.remove("show");
-    if (pwEl.value.length < 4) {
+
+    const staff = window.appSettings.staffMembers || [];
+    const rows = document.querySelectorAll("#settings-staff-list .staff-row");
+    // Validate every row BEFORE writing anything — a mid-loop failure
+    // would otherwise leave some rows saved and others not, with no
+    // obvious way to tell which from the UI.
+    const updates = [];
+    for (const row of rows) {
+      const idx = Number(row.dataset.staffIdx);
+      const name = row.querySelector('[data-field="name"]').value.trim();
+      const phone = row.querySelector('[data-field="phone"]').value.trim();
+      const newPassword = row.querySelector('[data-field="password"]').value;
+      if (!name || !phone) {
+        errEl.textContent = "Name and mobile number can't be blank.";
+        errEl.classList.add("show");
+        return;
+      }
+      if (newPassword && newPassword.length < 4) {
+        errEl.textContent = `New password for ${name} must be at least 4 characters.`;
+        errEl.classList.add("show");
+        return;
+      }
+      // A phone number now doubles as a login identifier — two staff
+      // sharing one would make login ambiguous (whoever the lookup finds
+      // first), so this has to stay unique the same way hallId/staff id
+      // already are for their own purposes.
+      const dupe = staff.find((s, i) => i !== idx && normalizePhone(s.phone) === normalizePhone(phone));
+      if (dupe) {
+        errEl.textContent = `That mobile number is already used by ${dupe.name}.`;
+        errEl.classList.add("show");
+        return;
+      }
+      updates.push({ idx, name, phone, newPassword });
+    }
+
+    for (const u of updates) {
+      staff[u.idx].name = u.name;
+      staff[u.idx].phone = u.phone;
+      if (u.newPassword) staff[u.idx].passwordHash = await sha256Hex(u.newPassword);
+    }
+    await saveSettings(window.appSettings);
+    renderSettingsStaff();
+    errEl.textContent = "Staff changes saved.";
+    errEl.classList.add("show");
+    errEl.style.color = "var(--available)";
+  });
+
+  document.getElementById("settings-add-staff-btn").addEventListener("click", async () => {
+    const errEl = document.getElementById("settings-add-staff-error");
+    errEl.classList.remove("show");
+    const nameEl = document.getElementById("settings-new-staff-name");
+    const phoneEl = document.getElementById("settings-new-staff-phone");
+    const pwEl = document.getElementById("settings-new-staff-password");
+    const name = nameEl.value.trim();
+    const phone = phoneEl.value.trim();
+    const pw = pwEl.value;
+
+    if (!name || !phone) {
+      errEl.textContent = "Enter a name and mobile number.";
+      errEl.classList.add("show");
+      return;
+    }
+    if (pw.length < 4) {
       errEl.textContent = "Password must be at least 4 characters.";
       errEl.classList.add("show");
       return;
     }
-
-    // The owner setting/resetting the staff password without knowing the
-    // old one is an Admin-SDK-only operation — the client can't do this to
-    // another account directly, so it goes through a Cloud Function that
-    // verifies the caller is really the owner (see functions/index.js).
-    // That function isn't deployed to this project yet (it needs a Blaze
-    // billing plan) — don't block the password change on it existing;
-    // fall through to the legacy hash update below either way, same as
-    // this always worked before the Cloud Function existed.
-    if (window.firebaseReady) {
-      try {
-        const setStaffPassword = firebase.functions().httpsCallable("setStaffPassword");
-        await setStaffPassword({ password: pwEl.value });
-      } catch (err) {
-        console.warn("[settings] setStaffPassword Cloud Function unavailable, falling back to legacy hash only", err);
-      }
+    if (findStaffByPhone(window.appSettings.staffMembers, phone)) {
+      errEl.textContent = "A staff member with that mobile number already exists.";
+      errEl.classList.add("show");
+      return;
     }
 
-    // Kept in sync as a fallback for when Firebase isn't reachable (see
-    // auth.js's legacy migration path) — not the primary security
-    // mechanism once Firestore rules require real auth.
-    window.appSettings.staffHash = await sha256Hex(pwEl.value);
+    window.appSettings.staffMembers = window.appSettings.staffMembers || [];
+    // Timestamp-based id, same reasoning as hall ids (settings-add-hall
+    // above) — never collides even if a staff member is removed and a new
+    // one added later.
+    window.appSettings.staffMembers.push({
+      id: `staff-${Date.now().toString(36)}`,
+      name,
+      phone,
+      passwordHash: await sha256Hex(pw),
+    });
     await saveSettings(window.appSettings);
+    nameEl.value = "";
+    phoneEl.value = "";
     pwEl.value = "";
-    errEl.textContent = "Staff password saved.";
-    errEl.classList.add("show");
-    errEl.style.color = "var(--available)";
+    renderSettingsStaff();
+  });
+
+  document.getElementById("settings-staff-list").addEventListener("click", async (ev) => {
+    const idxAttr = ev.target.dataset.removeStaffIdx;
+    if (idxAttr === undefined) return;
+    const idx = Number(idxAttr);
+    const staff = window.appSettings.staffMembers;
+    const ok = await confirmDialog(`Remove ${staff[idx].name} from staff? They will no longer be able to log in.`);
+    if (!ok) return;
+    staff.splice(idx, 1);
+    await saveSettings(window.appSettings);
+    renderSettingsStaff();
   });
 
   document.getElementById("settings-save-owner-pw").addEventListener("click", async () => {

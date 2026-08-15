@@ -77,13 +77,18 @@ const SETTINGS_KEY = "banquet:settings";
 
 async function getSettings() {
   const s = await safeGet(SETTINGS_KEY);
-  return (
-    s || {
-      halls: HALL_DEFAULTS,
-      ownerHash: null,
-      staffHash: null,
-    }
-  );
+  // Defaults spread FIRST, then whatever's actually stored on top — a
+  // settings doc that already exists (true for every live venue) still
+  // needs new fields like staffMembers backfilled; `s || {defaults}` would
+  // only apply when there's no doc at all, leaving staffMembers undefined
+  // on every existing installation.
+  return {
+    halls: HALL_DEFAULTS,
+    ownerHash: null,
+    staffHash: null,
+    staffMembers: [],
+    ...(s || {}),
+  };
 }
 
 async function saveSettings(settings) {

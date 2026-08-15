@@ -260,6 +260,84 @@ icon gone for good). Fixed by capturing/restoring via `innerHTML`
 instead — verified with a real generate-then-restore cycle confirming the
 icon's `<img>` survives byte-for-byte.
 
+## Named staff accounts (replaces the old single shared staff password)
+
+Staff used to be one shared password with no individual identity at all —
+"Received by"/"Collected by" on advances and settlements was a free-text
+field anyone with the staff password typed a name into by hand. That's
+gone: `window.appSettings.staffMembers` is now an array of
+`{ id, name, phone, passwordHash }` (owner-managed via Settings > Staff),
+and login for a non-owner requires a matching **mobile number**, not just
+a password — `auth.js`'s `handleLogin()` branches entirely on whether the
+mobile-number field is blank (owner path, unchanged) or filled (staff
+path: `findStaffByPhone()` looks the number up, `sha256Hex(pw)` is
+compared against that specific staff member's `passwordHash` — same
+client-side hash pattern as the owner password, same "soft deterrent, not
+real access control" security model already documented for this whole
+app). A successful staff login stores `banquet:staffName`/`banquet:staffId`
+in `sessionStorage` alongside the existing `banquet:role` — `currentStaffName()`
+(`auth.js`) returns that name, or `"Owner"` for the owner role, and is now
+the ONLY source for `receivedBy`/`settledBy` on advances/settlements
+(`addPaymentToDraft()`/`confirmSettlementHandler()` in `bookings-ui.js`) —
+those fields were removed from the booking modal's markup entirely and
+replaced with read-only `<strong>` displays that just show
+`currentStaffName()` (or, for an already-settled booking being reopened,
+the *historical* `draftSettlement.settledBy` — who actually settled it,
+not whoever happens to be viewing it now).
+
+**Phone number normalization matters more here than it first looks.**
+`normalizePhone()` (`core.js`) strips non-digits AND drops a leading
+India country code (`91`) when the remainder is still a plausible
+10-digit number — without this, "+91 98765 43210" (as the owner might
+paste it in when adding a staff member) and "9876543210" (as the staff
+member might actually type it at login) would normalize to *different*
+strings and simply fail to match, with no obvious reason why from either
+person's perspective. This was caught by a real test failure, not
+anticipated upfront — worth remembering if phone matching ever seems to
+silently fail again for a differently-formatted but equivalent number.
+Also used for duplicate detection when adding/editing staff (two staff
+sharing a phone number would make login ambiguous, so it's rejected).
+
+**Migration note — this is a breaking change for whoever was using the
+old shared staff password.** There is no automatic carryover: the old
+`staffHash` field is left in the settings shape (harmless, just unused
+now) but nothing reads it anymore, and there is no bulk-import from it
+into `staffMembers`. After this ships to a venue, its owner needs to add
+each real staff member (Settings > Staff) before they can log in again —
+this needs to happen promptly post-deploy, and the owner should be told
+directly rather than discovering it when staff can't get in.
+
+**`getSettings()`'s defaults-then-overlay pattern matters for this kind
+of change generally, not just this feature**: `{ ...defaults, ...(s || {}) }`,
+not `s || defaults` — the latter only applies defaults when a settings
+doc doesn't exist AT ALL, which is never true for any of the three live
+venues (they all already have one). Any future new settings field needs
+the same treatment, or it'll come back `undefined` on every existing
+installation despite looking like it has a sensible default.
+
+**Dormant code note**: `functions/index.js`'s `claimAccount`/`setStaffPassword`
+(undeployed — see "Security model" below) still reference the old single
+`STAFF_EMAIL`/`staffHash` concept and were NOT updated for this change,
+since they have zero live effect either way. If that real-Firebase-Auth
+migration is ever revisited, it would need its own rework for per-staff
+accounts (real Firebase Auth doesn't have a concept of "one fixed staff
+email" that maps to this new multi-staff model at all) — flag this
+explicitly if that migration ever comes back up.
+
+Tested end-to-end with real Playwright runs (Firebase network calls
+blocked via `context.route(...).abort()`, same convention as this
+project's existing test suites — see the Security model section below
+for why this matters: loading `src/` directly hits real production
+Firestore otherwise): first-time owner setup,
+adding a staff member, rejecting a duplicate phone number entered in a
+different format, staff login with a differently-formatted (but
+equivalent) phone number than how it was stored, wrong-password
+rejection, editing a staff member's name/phone without touching their
+password (old number stops working, new number + old password works),
+removing a staff member, and confirming a real `addPaymentToDraft()` call
+auto-signs the currently logged-in staff member's name with no manual
+input at all.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

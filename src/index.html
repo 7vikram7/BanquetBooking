@@ -26,6 +26,8 @@
     </div>
 
     <div id="login-normal-block" class="hidden">
+      <label>Mobile number <span class="muted">(staff only — leave blank if you're the owner)</span></label>
+      <input type="tel" id="login-phone" autocomplete="tel" />
       <label>Password</label>
       <input type="password" id="login-password" autocomplete="current-password" />
       <div class="modal-error" id="login-error"></div>
@@ -119,13 +121,21 @@
       <button class="btn btn-secondary btn-sm" id="settings-add-hall" type="button">+ Add Hall</button>
       <button class="btn btn-primary" id="settings-save-halls">Save hall names</button>
 
-      <h2>Staff password</h2>
+      <h2>Staff</h2>
       <div class="settings-block">
-        <p class="muted">Staff can manage bookings and enquiries but cannot see Settings.</p>
-        <label>New staff password</label>
-        <input type="password" id="settings-staff-password" autocomplete="new-password" />
+        <p class="muted">Staff can manage bookings and enquiries but cannot see Settings. Each staff member logs in with their own mobile number and password — advances/payments they record are signed with their name automatically.</p>
+        <div id="settings-staff-list"></div>
+        <button class="btn btn-primary" id="settings-save-staff-btn">Save Staff Changes</button>
         <div class="modal-error" id="settings-staff-error"></div>
-        <button class="btn btn-primary" id="settings-save-staff-pw">Save staff password</button>
+
+        <h3>Add a staff member</h3>
+        <div class="form-grid">
+          <label>Name <input type="text" id="settings-new-staff-name" /></label>
+          <label>Mobile number <input type="tel" id="settings-new-staff-phone" autocomplete="tel" /></label>
+          <label>Password <input type="password" id="settings-new-staff-password" autocomplete="new-password" /></label>
+        </div>
+        <button class="btn btn-secondary" id="settings-add-staff-btn" type="button">+ Add Staff</button>
+        <div class="modal-error" id="settings-add-staff-error"></div>
       </div>
 
       <h2>Owner password</h2>
@@ -281,7 +291,7 @@
         <label>Note <input type="text" id="bk-payment-note" /></label>
       </div>
       <div class="payment-confirm-row">
-        <label><span class="label-text">Received by<span class="required-star">*</span></span> <input type="text" id="bk-payment-receivedby" placeholder="Staff name" /></label>
+        <p class="muted">Received by <strong id="bk-payment-receivedby-display"></strong></p>
         <button class="btn btn-primary" id="bk-add-payment-btn" type="button">Confirm</button>
       </div>
       <div class="modal-error" id="bk-payment-error"></div>
@@ -330,7 +340,7 @@
       <p class="balance-line" id="bk-settlement-collect-line">Amount to be collected: <strong id="bk-settlement-collect-display">₹0</strong></p>
       <p class="balance-line settlement-recorded-line hidden" id="bk-settlement-recorded-line">Amount collected: <strong id="bk-settlement-recorded-display">₹0</strong> <span id="bk-settlement-recorded-by" class="muted"></span></p>
       <div class="payment-confirm-row">
-        <label><span class="label-text">Collected by<span class="required-star">*</span></span> <input type="text" id="bk-settlement-settled-by" placeholder="Staff name" /></label>
+        <p class="muted">Collected by <strong id="bk-settlement-settledby-display"></strong></p>
         <button class="btn btn-primary" id="bk-settlement-confirm-btn" type="button">Confirm Settlement</button>
       </div>
       <div class="modal-error" id="bk-settlement-error"></div>

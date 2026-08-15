@@ -7,7 +7,7 @@ const TAB_RENDERERS = {
   calendar: renderCalendar,
   dashboard: renderDashboard,
   accounts: renderAccountsList,
-  settings: async () => renderSettingsHalls(),
+  settings: async () => { renderSettingsHalls(); renderSettingsStaff(); },
 };
 
 async function refreshCurrentTab() {

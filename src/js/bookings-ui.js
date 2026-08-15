@@ -122,7 +122,7 @@ function openBookingModal(booking, prefill) {
   document.getElementById("bk-payment-amount").value = "";
   document.getElementById("bk-payment-date").value = todayIso();
   document.getElementById("bk-payment-mode").value = "cash";
-  document.getElementById("bk-payment-receivedby").value = "";
+  document.getElementById("bk-payment-receivedby-display").textContent = currentStaffName();
   document.getElementById("bk-payment-note").value = "";
   document.getElementById("bk-payment-error").classList.remove("show");
 
@@ -143,7 +143,9 @@ function openBookingModal(booking, prefill) {
     document.getElementById("bk-settlement-hall-rent").value = draftSettlement.finalHallRent || "";
     document.getElementById("bk-settlement-extra-amount").value = draftSettlement.finalExtraAmount || "";
     document.getElementById("bk-settlement-extra-reason").value = draftSettlement.finalExtraReason || "";
-    document.getElementById("bk-settlement-settled-by").value = draftSettlement.settledBy || "";
+    // Historical record of who actually settled it — NOT necessarily
+    // whoever is viewing it now, unlike the not-yet-settled branch below.
+    document.getElementById("bk-settlement-settledby-display").textContent = draftSettlement.settledBy || "";
     document.getElementById("bk-settlement-date").value = draftSettlement.settledDate || todayIso();
     document.getElementById("bk-settlement-gst").checked = !!draftSettlement.gstApplied;
     // Already settled at least once — show the collection figures
@@ -161,7 +163,9 @@ function openBookingModal(booking, prefill) {
     document.getElementById("bk-settlement-hall-rent").value = booking?.hallRent || "";
     document.getElementById("bk-settlement-extra-amount").value = booking?.extraAmount || "";
     document.getElementById("bk-settlement-extra-reason").value = booking?.extraAmountReason || "";
-    document.getElementById("bk-settlement-settled-by").value = "";
+    // Who WOULD be signing this if confirmed right now — the person
+    // actually viewing this booking, since it isn't settled yet.
+    document.getElementById("bk-settlement-settledby-display").textContent = currentStaffName();
     document.getElementById("bk-settlement-date").value = todayIso();
     document.getElementById("bk-settlement-gst").checked = false;
     document.getElementById("bk-settlement-collection-block").classList.add("hidden");
@@ -199,7 +203,6 @@ function openBookingModal(booking, prefill) {
   [
     "bk-settlement-plates", "bk-settlement-per-plate-cost", "bk-settlement-hall-rent",
     "bk-settlement-extra-amount", "bk-settlement-extra-reason", "bk-settlement-date", "bk-settlement-gst",
-    "bk-settlement-settled-by",
   ].forEach((id) => {
     document.getElementById(id).disabled = settlementLocked;
   });
@@ -264,22 +267,14 @@ async function addPaymentToDraft() {
   const amount = toNumber(document.getElementById("bk-payment-amount").value);
   const date = document.getElementById("bk-payment-date").value || todayIso();
   const mode = document.getElementById("bk-payment-mode").value;
-  const receivedBy = document.getElementById("bk-payment-receivedby").value.trim();
+  // Auto-signed from whoever is actually logged in — no longer manually
+  // typed, so it can't be misattributed or left blank.
+  const receivedBy = currentStaffName();
   const note = document.getElementById("bk-payment-note").value.trim();
   if (amount <= 0) return; // nothing to confirm
 
-  // Received-by is only required at the moment a payment is actually
-  // being confirmed — it's not a required field on the booking as a
-  // whole, just a precondition for this one action.
-  if (!receivedBy) {
-    errEl.textContent = "Enter who received this payment before confirming it.";
-    errEl.classList.add("show");
-    return;
-  }
-
   draftPayments.push({ id: uid("pay"), amount, date, mode, receivedBy, note });
   document.getElementById("bk-payment-amount").value = "";
-  document.getElementById("bk-payment-receivedby").value = "";
   document.getElementById("bk-payment-note").value = "";
   renderDraftPayments();
 
@@ -496,12 +491,9 @@ function confirmSettlementHandler() {
     return;
   }
 
-  const settledBy = document.getElementById("bk-settlement-settled-by").value.trim();
-  if (!settledBy) {
-    errEl.textContent = "Enter who collected the payment before confirming.";
-    errEl.classList.add("show");
-    return;
-  }
+  // Auto-signed from whoever is actually logged in — no longer manually
+  // typed, so it can't be misattributed.
+  const settledBy = currentStaffName();
 
   const subtotal = computeSettlementSubtotal();
   const gstApplied = settlementGstApplied();
