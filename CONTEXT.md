@@ -291,6 +291,27 @@ status, so an advance taken on a booking that hasn't been settled yet
 still counts — the two tabs answering genuinely different questions, not
 one being a stale copy of the other.
 
+**Below the four stat cards, four itemized `.simple-list`s** (added right
+after the stat-only version shipped, once "just give me numbers" turned
+out not to be enough) — Enquiries, Confirmed events, Settlements, and
+Money received, each row clickable through to the underlying
+`openEnquiryModal()`/`openBookingModal()`, same drill-down UX as
+Dashboard's Upcoming/Open Enquiries lists. **Money received is itemized
+per actual payment, not per booking** — `computeSummaryData()` walks
+every active booking's `payments[]` (excluding legacy
+`isFinalCollection` entries, same as `bookingPaid()`) AND, separately,
+its settlement collection if one exists, pushing one row per
+money-changing-hands event with its own date/`receivedBy`-or-`settledBy`
+("staff name")/amount — a booking with three advances plus a settlement
+produces four rows here, not one, since the point of this list is "who
+collected what and when," which a single per-booking total can't answer.
+`computeSummaryData(from, to)` is shared verbatim between
+`renderSummaryTab()` (on-screen) and `generateSummaryExcel()` (download)
+so the two can never drift apart — same lazy-loaded-SheetJS pattern as
+`generateAccountsExcel()`/`generateDirectoryExcel()`, one workbook with
+four sheets (Enquiries/Confirmed Events/Settlements/Money Received)
+mirroring the four on-screen lists exactly.
+
 ## Named staff accounts (replaces the old single shared staff password)
 
 Staff used to be one shared password with no individual identity at all —
