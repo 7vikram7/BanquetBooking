@@ -589,6 +589,13 @@ async function saveBooking() {
     savedBooking = await BookingsStore.addRecord({
       id: newId,
       createdAt: new Date().toISOString(),
+      // Who actually took this booking, not who it's later edited by —
+      // same one-time-stamped-at-creation pattern as receivedBy/settledBy
+      // on advances/settlements. Used by the Summary tab's "Bookings Made"
+      // list (see summary-ui.js) to show who booked each event. Bookings
+      // created before this field existed have no value here — degrades
+      // to "—" wherever it's displayed, same as those other two fields.
+      createdBy: currentStaffName(),
       enquiryId: pendingEnquiryLink?.id || null,
       ...data,
     });

@@ -3,12 +3,12 @@
 
 let currentTab = "calendar";
 
-// Directory deliberately excluded — it only loads when the owner presses
-// its own Search button (see initDirectoryTab() in directory-ui.js), not
-// on every tab switch or after every save elsewhere in the app.
+// Directory and Summary deliberately excluded — both only load when their
+// own Search button is pressed (initDirectoryTab()/initSummaryTab()), not
+// on every tab switch or after every save elsewhere in the app, since both
+// scan a much wider window of data than what's actually displayed.
 const TAB_RENDERERS = {
   calendar: renderCalendar,
-  summary: renderSummaryTab,
   dashboard: renderDashboard,
   accounts: renderAccountsList,
   settings: async () => { renderSettingsHalls(); renderSettingsStaff(); },

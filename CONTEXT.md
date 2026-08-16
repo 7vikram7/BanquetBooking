@@ -271,46 +271,72 @@ owner. Summary's nav button has neither `class="hidden"` nor
 already is — there's no separate "staff-visible" flag to opt into, just
 the *absence* of the owner-only gate.
 
-Shows four numbers for a From/To range (defaults to today, plain editable
-date inputs, same pattern as Accounts): enquiries count, confirmed events
-count (`status !== "cancelled"`), settlements-done count
-(`b.settlement?.settledBy` truthy — same test Accounts uses), and total
-money received. All four use `EnquiriesStore.getRange()`/
-`BookingsStore.getRange()` against the record's own `date` field (the
-EVENT date), consistent with how Accounts/Directory/Dashboard's Event
-Summary already scope their ranges — this reads as "how much is
-happening/being collected for events in this window", not an activity
-log of what got typed into the app that day.
+Four stat cards for a From/To range (defaults to today, plain editable
+date inputs), plus four itemized `.simple-list`s below them — Enquiries,
+Bookings made, Settlements, Money received — each row clickable through
+to the underlying `openEnquiryModal()`/`openBookingModal()`, same
+drill-down UX as Dashboard's Upcoming/Open Enquiries lists. A Download
+Excel button exports the same four lists as a 4-sheet workbook, built
+from the identical `computeSummaryData(from, to)` the on-screen view
+uses so the two can never drift apart — same lazy-loaded-SheetJS pattern
+as `generateAccountsExcel()`/`generateDirectoryExcel()`.
+
+**"Bookings made" (and Settlements/Money received) are scoped by their
+own ACTION date, not the booking's event date — this took two tries to
+get right.** The first version called `BookingsStore.getRange(from,to)`
+directly, same as Accounts/Directory/Dashboard's Event Summary already
+do — but those tabs are deliberately answering "what's happening for
+events in this window," which is the WRONG question here. Reported after
+shipping: "by confirmed events I mean events that were confirmed or
+booked today — the date of the event can be in future any time." A
+booking taken today for a wedding 8 months out has an event `date` 8
+months from now, so `getRange(today,today)` never returns it at all —
+silently wrong, not just mislabeled. Same underlying bug existed for
+Settlements and Money received too (a settlement closed today for an
+event booked/held long ago, or an advance collected today toward a
+future event, were equally invisible), just not the one initially
+reported.
+
+Fixed by decoupling the fetch from the filter: `computeSummaryData()`
+pulls `BookingsStore.getRange(scanFrom, scanTo)` across a WIDE window —
+`SUMMARY_SCAN_YEARS_BACK/FORWARD` (15/5, the same constants and reasoning
+as Directory's `DIRECTORY_BACKFILL_YEARS_BACK/FORWARD`) — once, then
+filters each metric by its own actual date: "Bookings made" by
+`(b.createdAt || "").slice(0,10)` falling in `[from,to]`, Settlements by
+`settlement.settledDate`, and each Money-received row by its own
+`payment.date`/`settledDate` — never by the booking's event `date`.
+Enquiries were deliberately left on `EnquiriesStore.getRange(from,to)`
+(event-date scoped) — not what was reported broken, and "enquiries about
+events happening in this window" is a different, also-legitimate
+question from "enquiries received in this window"; revisit if that
+turns out to be wanted too.
+
+Because the underlying fetch is now a wide, expensive scan (same cost
+profile as Directory's backfill), the tab got the same UX fix Directory
+already needed for the identical reason: an explicit Search button
+(`summary-search-btn`) instead of auto-loading on tab switch or date
+change — `summary` is deliberately excluded from `TAB_RENDERERS` in
+`init.js`, same as `directory`. First attempt at this fix forgot that
+step and still auto-rendered stale (event-date-scoped, in this case)
+results on every tab open; caught by a test that checked the list's
+content *before* clicking Search, not just after.
+
+**"Booked by" (`booking.createdBy`)** is a new field, stamped with
+`currentStaffName()` at booking-creation time in `saveBooking()`
+(`bookings-ui.js`) — the same one-line, stamped-once-at-creation pattern
+already used for `receivedBy` (advances) and `settledBy` (settlements).
+Bookings created before this field existed have no value here and
+display "—" in the Bookings-made list/Excel column, same graceful
+degradation those other two fields already use for pre-existing data.
 
 **"Total money received" deliberately does NOT reuse Accounts'
 `totalPaid` computation** — Accounts scopes to `settlement?.settledBy`
-bookings only, because that tab is a settled-events ledger, not a general
-cash-received figure. Summary sums `bookingTotalReceived(b)` (core.js)
-across every non-cancelled booking in range regardless of settlement
-status, so an advance taken on a booking that hasn't been settled yet
+bookings only, because that tab is a settled-events ledger, not a
+general cash-received figure. Summary counts every advance/settlement
+collection whose own date falls in range regardless of that booking's
+settlement status, so an advance taken on a still-unsettled booking
 still counts — the two tabs answering genuinely different questions, not
 one being a stale copy of the other.
-
-**Below the four stat cards, four itemized `.simple-list`s** (added right
-after the stat-only version shipped, once "just give me numbers" turned
-out not to be enough) — Enquiries, Confirmed events, Settlements, and
-Money received, each row clickable through to the underlying
-`openEnquiryModal()`/`openBookingModal()`, same drill-down UX as
-Dashboard's Upcoming/Open Enquiries lists. **Money received is itemized
-per actual payment, not per booking** — `computeSummaryData()` walks
-every active booking's `payments[]` (excluding legacy
-`isFinalCollection` entries, same as `bookingPaid()`) AND, separately,
-its settlement collection if one exists, pushing one row per
-money-changing-hands event with its own date/`receivedBy`-or-`settledBy`
-("staff name")/amount — a booking with three advances plus a settlement
-produces four rows here, not one, since the point of this list is "who
-collected what and when," which a single per-booking total can't answer.
-`computeSummaryData(from, to)` is shared verbatim between
-`renderSummaryTab()` (on-screen) and `generateSummaryExcel()` (download)
-so the two can never drift apart — same lazy-loaded-SheetJS pattern as
-`generateAccountsExcel()`/`generateDirectoryExcel()`, one workbook with
-four sheets (Enquiries/Confirmed Events/Settlements/Money Received)
-mirroring the four on-screen lists exactly.
 
 ## Named staff accounts (replaces the old single shared staff password)
 
