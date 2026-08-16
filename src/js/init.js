@@ -8,6 +8,7 @@ let currentTab = "calendar";
 // on every tab switch or after every save elsewhere in the app.
 const TAB_RENDERERS = {
   calendar: renderCalendar,
+  summary: renderSummaryTab,
   dashboard: renderDashboard,
   accounts: renderAccountsList,
   settings: async () => { renderSettingsHalls(); renderSettingsStaff(); },
@@ -77,6 +78,7 @@ async function onAuthSuccess() {
   wireSyncStatusBanner();
 
   initCalendarNav();
+  initSummaryTab();
   initEnquiryModal();
   initBookingModal();
   initDashboardSummary();

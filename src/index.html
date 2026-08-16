@@ -54,6 +54,7 @@
 
   <nav class="tab-nav">
     <button class="tab-btn active" data-tab="calendar">Calendar</button>
+    <button class="tab-btn" data-tab="summary">Summary</button>
     <button class="tab-btn hidden" data-tab="dashboard" data-owner-only>Dashboard</button>
     <button class="tab-btn hidden" data-tab="accounts" data-owner-only>Accounts</button>
     <button class="tab-btn hidden" data-tab="directory" data-owner-only>Directory</button>
@@ -77,6 +78,16 @@
         <span><i class="dot dot-settled"></i>Settled</span>
       </div>
       <div id="calendar-grid" class="calendar-grid"></div>
+    </section>
+
+    <!-- -------------------- SUMMARY -------------------- -->
+    <section id="tab-summary" class="tab-panel">
+      <p class="muted">A quick overview for a day or date range — visible to both the owner and staff.</p>
+      <div class="filter-row">
+        <label class="inline-label">From <input type="date" id="summary-filter-from" /></label>
+        <label class="inline-label">To <input type="date" id="summary-filter-to" /></label>
+      </div>
+      <div id="summary-stats" class="acct-summary"></div>
     </section>
 
     <!-- -------------------- DASHBOARD -------------------- -->
@@ -410,6 +421,7 @@
 <script src="js/bookings-ui.js"></script>
 <script src="js/accounts-ui.js"></script>
 <script src="js/directory-ui.js"></script>
+<script src="js/summary-ui.js"></script>
 <script src="js/settings-ui.js"></script>
 <script src="js/init.js"></script>
 </body>

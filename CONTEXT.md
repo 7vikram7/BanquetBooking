@@ -260,6 +260,37 @@ icon gone for good). Fixed by capturing/restoring via `innerHTML`
 instead — verified with a real generate-then-restore cycle confirming the
 icon's `<img>` survives byte-for-byte.
 
+## Summary tab — the one tab both owner and staff see
+
+`summary-ui.js`'s tab is deliberately the only one besides Calendar that
+staff can open. Every other non-Calendar tab (`dashboard`, `accounts`,
+`directory`, `settings`) is gated `data-owner-only` in `index.html`, which
+`applyRoleVisibility()` (`auth.js`) hides for anyone not logged in as
+owner. Summary's nav button has neither `class="hidden"` nor
+`data-owner-only`, so it's visible unconditionally, the same way Calendar
+already is — there's no separate "staff-visible" flag to opt into, just
+the *absence* of the owner-only gate.
+
+Shows four numbers for a From/To range (defaults to today, plain editable
+date inputs, same pattern as Accounts): enquiries count, confirmed events
+count (`status !== "cancelled"`), settlements-done count
+(`b.settlement?.settledBy` truthy — same test Accounts uses), and total
+money received. All four use `EnquiriesStore.getRange()`/
+`BookingsStore.getRange()` against the record's own `date` field (the
+EVENT date), consistent with how Accounts/Directory/Dashboard's Event
+Summary already scope their ranges — this reads as "how much is
+happening/being collected for events in this window", not an activity
+log of what got typed into the app that day.
+
+**"Total money received" deliberately does NOT reuse Accounts'
+`totalPaid` computation** — Accounts scopes to `settlement?.settledBy`
+bookings only, because that tab is a settled-events ledger, not a general
+cash-received figure. Summary sums `bookingTotalReceived(b)` (core.js)
+across every non-cancelled booking in range regardless of settlement
+status, so an advance taken on a booking that hasn't been settled yet
+still counts — the two tabs answering genuinely different questions, not
+one being a stale copy of the other.
+
 ## Named staff accounts (replaces the old single shared staff password)
 
 Staff used to be one shared password with no individual identity at all —
