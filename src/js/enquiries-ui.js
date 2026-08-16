@@ -96,12 +96,26 @@ function readEnquiryForm() {
 let enquirySavePromise = null;
 
 async function saveEnquiry() {
-  if (!enquirySavePromise) {
-    enquirySavePromise = performSaveEnquiry().finally(() => {
-      enquirySavePromise = null;
-    });
+  // Visual complement to the promise guard above, not a replacement for
+  // it — disabling the button closes off the double-click at its source
+  // (most users double-click BECAUSE nothing visibly happens on the first
+  // click), while the promise cache is what actually guarantees no
+  // duplicate record even if this is ever triggered another way.
+  const btn = document.getElementById("enq-save-btn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    if (!enquirySavePromise) {
+      enquirySavePromise = performSaveEnquiry().finally(() => {
+        enquirySavePromise = null;
+      });
+    }
+    return await enquirySavePromise;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
   }
-  return enquirySavePromise;
 }
 
 async function performSaveEnquiry() {
@@ -141,6 +155,17 @@ async function performSaveEnquiry() {
       source: "Enquiry",
       sourceId: newId,
     });
+    // Mirrors saveBooking()'s identical backfill after creating a new
+    // record — #enq-id/#enq-orig-date stay the source of truth for "is
+    // this an update now, not a fresh create" for as long as this modal
+    // instance is reachable at all, closed or not. Both are needed
+    // together: updateRecord() looks the record up by date bucket, so
+    // backfilling the id alone without the date left a real gap — a
+    // stray second call after this one resolved took the "update" branch
+    // (id no longer empty) but with an empty origDate, and threw "Record
+    // not found" trying to update a record in no bucket at all.
+    document.getElementById("enq-id").value = newId;
+    document.getElementById("enq-orig-date").value = data.date;
   }
   closeModal("modal-enquiry");
   await refreshCurrentTab();

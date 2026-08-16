@@ -694,9 +694,50 @@ Directory cleanup). One group (Suraj salunkhe, 2026-08-26) was
 deliberately left untouched — its two surviving records differ in
 `eventType` ("Other" vs "Get-together"), so unlike the other 10 groups
 it isn't a confirmed identical duplicate; left for the owner to review
-manually rather than guessed at. Saga/Ram Krishna Banquet were not
-checked for the same issue — lower risk given far less usage, but worth
-a spot-check if this ever comes up again for either of them.
+manually rather than guessed at.
+
+**Follow-up spot-check on Saga/Ram Krishna Banquet found the same bug
+had already produced real duplicates there too** — Ram Krishna Banquet
+was clean (no bookings yet, one enquiry, no dupes), but Saga had 2
+duplicate booking groups and 7 duplicate enquiry pairs, cleaned up the
+same way with the owner's go-ahead. One Saga booking group ("Mr umesh
+dhende", 2026-09-13) was left alone for the same reason as Suraj
+salunkhe: its 3 records were created 5 minutes apart (not the
+1-3-second double-click signature), each carries its OWN separate
+₹10,000 advance, and two link to different source enquiries — this
+reads as a staff member genuinely re-entering the booking multiple
+times, possibly with real money collected each time, not a confirmable
+duplicate to silently merge.
+
+**Two further hardening changes, both defense-in-depth on top of the
+promise guard, not replacements for it:**
+
+1. **`bk-save-btn`/`enq-save-btn` now disable and relabel "Saving…"**
+   for the duration of the save (`handleBookingSaveClick()`/
+   `saveEnquiry()`), same pattern as every other async button in this
+   app (Excel/PDF generation, Directory's Search). Most double-clicks
+   happen precisely because nothing visibly happens after the first
+   click — a disabled button doesn't dispatch `click` at all, so this
+   closes off the double-click at its source, on top of the promise
+   guard still preventing a duplicate even if triggered another way.
+
+2. **`saveEnquiry()`'s new-record branch now backfills `#enq-id` AND
+   `#enq-orig-date`** after creating a record, mirroring
+   `saveBooking()`'s existing identical backfill — enquiries never had
+   this. Found by a test that fired clicks in two separate batches
+   (simulating a stray re-click well after the first save had already
+   resolved and re-enabled the button, not a same-instant double-click):
+   without the id backfill, a second call still took the "new record"
+   branch and created a second enquiry; with the id backfilled but NOT
+   the date, a second call took the "update" branch instead but with an
+   empty `origDate` and threw `Record not found` trying to update a
+   record in no date bucket at all — `updateRecord()` looks records up
+   by their date bucket, so both fields were needed together, not just
+   the id. In normal use `saveEnquiry()`'s only caller (the Save button)
+   always closes the modal right after a successful save, so this gap
+   wasn't reachable through a real click — fixed anyway since it's a
+   one-line consistency fix and removes a latent footgun for any future
+   change that keeps the enquiry modal open after saving.
 
 ## Security model — real Firebase Auth, two fixed role accounts
 

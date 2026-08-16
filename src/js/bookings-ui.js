@@ -667,9 +667,25 @@ async function performSaveBooking() {
 // editor's "Done" button also call saveBooking() to persist in-progress
 // changes without leaving the (long, multi-section) form, so closing has
 // to live here rather than inside saveBooking() itself.
+//
+// Disabling the button here is a visual complement to saveBooking()'s own
+// promise guard, not a replacement for it — most double-clicks happen
+// BECAUSE nothing visibly happens on the first click, so closing off the
+// second click at its source (a disabled button doesn't dispatch click at
+// all) is worth doing even though the promise cache already guarantees no
+// duplicate record either way.
 async function handleBookingSaveClick() {
-  const ok = await saveBooking();
-  if (ok) closeModal("modal-booking");
+  const btn = document.getElementById("bk-save-btn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+  try {
+    const ok = await saveBooking();
+    if (ok) closeModal("modal-booking");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 }
 
 async function deleteBookingHandler() {
