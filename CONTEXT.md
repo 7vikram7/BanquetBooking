@@ -648,6 +648,56 @@ that: clicks the bottom Save on a freshly reopened booking and confirms
 booking, confirms an advance, and confirms the modal is *still* visible
 afterward.
 
+## `saveBooking()`/`saveEnquiry()` are guarded against double-click duplicates
+
+Reported as "multiple entries of the same event" on Shree Krishna
+Palace's Dashboard — turned out to be real duplicate `BookingsStore`
+records, not a display bug. Found by dumping production Firestore
+directly (same technique as the earlier Directory duplicate
+investigation): 11 groups of 2-3 records each, same customer/hall/
+slot/date/**same payment id** in every copy, `createdAt` timestamps 1-3
+seconds apart — the signature of a user double-clicking (or
+double-tapping) Save, not two genuinely separate bookings.
+
+Root cause: neither `saveBooking()` nor `saveEnquiry()` guarded against
+being invoked again while a previous call was still in flight. For a
+brand-new record, `#bk-id`/`#enq-id` stay empty until the FIRST call's
+`BookingsStore.addRecord()`/`EnquiriesStore.addRecord()` actually
+resolves — a second click landing before that finish line still reads
+an empty id, takes the "new record" branch, and creates a second,
+completely independent record. (A comment on the old code claimed "a
+second save in the same session... updates this same record instead of
+creating a duplicate" — true for a SEQUENTIAL second call after the
+first resolved, false for a CONCURRENT one, which is exactly what a
+double-click produces.) `saveBooking()` is especially exposed since it
+has three call sites (`bk-save-btn`, `addPaymentToDraft()`'s Confirm,
+the menu editor's Done), any of which could race against another.
+
+Fixed with the same in-flight-promise-caching pattern already proven
+for `directory-ui.js`'s `ensureDirectoryBackfilled()`: the actual save
+logic was renamed `performSaveBooking()`/`performSaveEnquiry()`, and
+`saveBooking()`/`saveEnquiry()` now just cache and return that promise
+(cleared via `.finally()` once it settles) so every caller — however
+many times either is invoked concurrently — awaits the exact same
+underlying save instead of each starting its own. A LATER, sequential
+call (after the previous one already resolved) is unaffected and still
+updates the existing record normally. Verified with two Playwright
+tests: 5 concurrent clicks on `bk-save-btn`/`enq-save-btn` each produce
+exactly 1 record (previously up to 5); a legitimate sequential flow
+(save, reopen, add an advance, save again) still correctly updates the
+same record rather than creating a second one.
+
+**Production cleanup**: with the user's explicit go-ahead, removed the
+11 confirmed-duplicate booking records from banquet-74423's Firestore
+(same GET/dedupe/PATCH-`updateMask.fieldPaths=value` technique as the
+Directory cleanup). One group (Suraj salunkhe, 2026-08-26) was
+deliberately left untouched — its two surviving records differ in
+`eventType` ("Other" vs "Get-together"), so unlike the other 10 groups
+it isn't a confirmed identical duplicate; left for the owner to review
+manually rather than guessed at. Saga/Ram Krishna Banquet were not
+checked for the same issue — lower risk given far less usage, but worth
+a spot-check if this ever comes up again for either of them.
+
 ## Security model — real Firebase Auth, two fixed role accounts
 
 As of the 2026-08 accounts migration, this is backed by real Firebase

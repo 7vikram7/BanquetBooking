@@ -553,7 +553,31 @@ function confirmSettlementHandler() {
 // to close the booking modal is the × button. This lets the user keep
 // working in the same modal after saving (e.g. immediately downloading
 // "View Booking Confirmation") without having to reopen it.
+// Caches the IN-FLIGHT promise, not just running the save directly — a
+// real production bug, found as duplicate booking records (same
+// customer/hall/slot/date, different ids, createdAt timestamps 1-3
+// seconds apart): saveBooking() is called from three places (this
+// button, addPaymentToDraft(), the menu editor's "Done"), and for a
+// brand-new booking, #bk-id stays empty until the FIRST save's
+// BookingsStore.addRecord() actually resolves — so a second click (or a
+// second trigger) landing before that finishes still takes the
+// "new record" branch and creates a completely separate booking, unaware
+// of the first one's in-flight write. Same root cause and same fix
+// (cache the promise, not a completion flag) as directory-ui.js's
+// ensureDirectoryBackfilled() — every caller, however many times this is
+// invoked concurrently, awaits the exact same save.
+let bookingSavePromise = null;
+
 async function saveBooking() {
+  if (!bookingSavePromise) {
+    bookingSavePromise = performSaveBooking().finally(() => {
+      bookingSavePromise = null;
+    });
+  }
+  return bookingSavePromise;
+}
+
+async function performSaveBooking() {
   const errEl = document.getElementById("bk-error");
   errEl.classList.remove("show");
 

@@ -89,7 +89,22 @@ function readEnquiryForm() {
   };
 }
 
+// Same in-flight-promise guard as bookings-ui.js's saveBooking(), for the
+// identical reason: #enq-id stays empty for a brand-new enquiry until this
+// finishes, so an unguarded double-click would take the "new record"
+// branch twice and create two enquiries for one entry.
+let enquirySavePromise = null;
+
 async function saveEnquiry() {
+  if (!enquirySavePromise) {
+    enquirySavePromise = performSaveEnquiry().finally(() => {
+      enquirySavePromise = null;
+    });
+  }
+  return enquirySavePromise;
+}
+
+async function performSaveEnquiry() {
   const errEl = document.getElementById("enq-error");
   errEl.classList.remove("show");
   const data = readEnquiryForm();
