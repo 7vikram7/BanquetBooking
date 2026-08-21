@@ -265,6 +265,22 @@ function formatDateHuman(isoDateStr) {
   });
 }
 
+// <input type="time">'s own .value is always 24-hour "HH:MM" per the HTML
+// spec, regardless of how the browser's native picker UI displays it to
+// the user (locale-dependent) — so parsing it as a plain string here
+// (not via toLocaleTimeString, which WOULD vary by locale/OS) is what
+// actually guarantees a consistent 12-hour "h:mm AM/PM" display across
+// every venue, browser, and OS, per the explicit ask for that.
+function formatTime12Hour(hhmm) {
+  if (!hhmm) return "";
+  const [hStr, mStr] = hhmm.split(":");
+  let h = Number(hStr);
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${mStr} ${period}`;
+}
+
 function monthLabel(ymKey) {
   const [y, m] = ymKey.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, {

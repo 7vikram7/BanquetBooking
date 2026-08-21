@@ -198,6 +198,35 @@ exits early once it fits) for the same robustness reason — a single
 linear correction is exact only when nothing wraps (e.g. long notes text
 re-wrapping at a different scale is not perfectly linear).
 
+## Menu editor: Starters/Main Course pickup times, always 12-hour
+
+Only `starters`/`mainCourse` (`MENU_PICKUP_TIME_CATEGORIES` in
+`bookings-ui.js`) get a `<input type="time">` "Pickup time" field in the
+menu editor — the two categories actually staggered during real service;
+the other ten don't need one and it would just be UI noise. Stored as
+`draftMenuTimes = { starters: "HH:MM", mainCourse: "HH:MM" }` (same
+draft-until-Save/Done pattern as `draftMenu`/`draftPayments` — reset from
+`booking?.menuPickupTimes` in `openBookingModal()`, persisted onto the
+record as `menuPickupTimes` in `readBookingForm()`), and shown wherever
+the menu itself is shown: the on-screen `#bk-menu-summary` line, the Menu
+PDF (`layoutMenuBody()` appends it to the category heading text, e.g.
+"Starters — Pickup: 7:30 PM"), and the Menu share-image
+(`generateMenuImage()`'s section heading, same format).
+
+**Always 12-hour, "for all venues," regardless of what the native time
+picker's own UI shows.** `<input type="time">`'s `.value` is always
+24-hour zero-padded `"HH:MM"` per the HTML spec — that's stored as-is
+(keeps it trivially re-editable in the same input type), but every place
+it's actually DISPLAYED goes through a new `formatTime12Hour()` (`core.js`):
+manual string parsing (split on `:`, `% 12` with a `0 → 12` fixup for
+midnight/noon), deliberately NOT `toLocaleTimeString()` — that would
+follow the browser/OS locale, which is exactly the inconsistency "12-hour
+for all venues" was asked to rule out. The picker's own on-screen widget
+may still render 24-hour depending on the visiting browser/OS locale
+(nothing in a web page can override that natively) — only the app's own
+rendered text (summary/PDF/image) is guaranteed 12-hour, which is what's
+actually shared with anyone outside the app.
+
 ## Click-to-call and WhatsApp sharing
 
 **Click-to-call**: `wireCallButton(inputId, buttonId)` (`core.js`) is the

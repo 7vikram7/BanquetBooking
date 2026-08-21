@@ -57,6 +57,19 @@ function initBookingModal() {
 let editingBookingId = null;
 let draftPayments = [];
 let draftMenu = {}; // { [categoryId]: string[] }
+// Pickup times for the two categories that actually need a serving-time
+// coordination point (starters/main course are typically staggered during
+// service; the others aren't) — { starters: "HH:MM", mainCourse: "HH:MM" },
+// 24-hour string straight from <input type="time">'s own .value. Only
+// ever formatted to 12-hour AM/PM at DISPLAY time (formatTime12Hour() in
+// core.js), never stored that way — storing the raw 24-hour value keeps
+// it trivially re-editable in the same <input type="time">.
+let draftMenuTimes = {};
+// Only these two categories get a pickup-time input — starters and main
+// course are the ones actually staggered during service; a fixed list
+// rather than every category having one, since most (soup, salad, dal,
+// dessert, etc.) don't need this at all and it would just be UI noise.
+const MENU_PICKUP_TIME_CATEGORIES = ["starters", "mainCourse"];
 let draftSettlement = null; // null until "Confirm Settlement" is clicked
 // Whether this booking already had a saved, persisted settlement when the
 // modal was opened — fixed for the life of this modal session, unlike
@@ -79,6 +92,7 @@ function openBookingModal(booking, prefill) {
   const legacyCollectionPayment = draftPayments.find((p) => p.isFinalCollection);
   draftPayments = draftPayments.filter((p) => !p.isFinalCollection);
   draftMenu = booking?.menu ? JSON.parse(JSON.stringify(booking.menu)) : {};
+  draftMenuTimes = booking?.menuPickupTimes ? { ...booking.menuPickupTimes } : {};
   pendingEnquiryLink = prefill?.fromEnquiry || null;
 
   const isEdit = !!booking;
@@ -353,6 +367,7 @@ function readBookingForm() {
     notes: document.getElementById("bk-notes").value.trim(),
     payments: draftPayments,
     menu: draftMenu,
+    menuPickupTimes: draftMenuTimes,
     settlement: draftSettlement,
   };
 }
@@ -722,13 +737,22 @@ async function deleteBookingHandler() {
 // record when the booking itself is saved, same as draftPayments.
 // ---------------------------------------------------------------------------
 
+function menuPickupTimesSummary() {
+  const parts = MENU_PICKUP_TIME_CATEGORIES
+    .filter((id) => draftMenuTimes[id])
+    .map((id) => `${MENU_CATEGORIES.find((c) => c.id === id).name} at ${formatTime12Hour(draftMenuTimes[id])}`);
+  return parts.join(" · ");
+}
+
 function updateMenuSummary() {
   const categoriesWithItems = MENU_CATEGORIES.filter((c) => (draftMenu[c.id] || []).length > 0);
   const totalItems = categoriesWithItems.reduce((sum, c) => sum + draftMenu[c.id].length, 0);
   const summaryEl = document.getElementById("bk-menu-summary");
-  summaryEl.textContent = totalItems
+  const itemsText = totalItems
     ? `${totalItems} item${totalItems > 1 ? "s" : ""} across ${categoriesWithItems.length} categor${categoriesWithItems.length > 1 ? "ies" : "y"}.`
     : "No menu items yet.";
+  const timesText = menuPickupTimesSummary();
+  summaryEl.textContent = timesText ? `${itemsText} · ${timesText}` : itemsText;
   // Quick PDF access without opening the full menu editor — only useful
   // once there's actually a menu to view/download.
   document.getElementById("bk-download-menu-btn").classList.toggle("hidden", totalItems === 0);
@@ -756,6 +780,30 @@ function renderMenuCategories() {
     header.className = "menu-category-header";
     header.textContent = cat.name;
     block.appendChild(header);
+
+    if (MENU_PICKUP_TIME_CATEGORIES.includes(cat.id)) {
+      const timeRow = document.createElement("label");
+      timeRow.className = "menu-pickup-time-row";
+      const timeLabelText = document.createElement("span");
+      timeLabelText.textContent = "Pickup time";
+      const timeInput = document.createElement("input");
+      timeInput.type = "time";
+      // The native picker's own display format follows the browser/OS
+      // locale (could be 24-hour there) — that's fine, it's just an entry
+      // widget. Every place this is actually SHOWN to someone (this
+      // summary line, the PDF, the shareable image) goes through
+      // formatTime12Hour() instead, which is what actually guarantees
+      // 12-hour AM/PM consistently, independent of that.
+      timeInput.value = draftMenuTimes[cat.id] || "";
+      timeInput.addEventListener("change", () => {
+        if (timeInput.value) draftMenuTimes[cat.id] = timeInput.value;
+        else delete draftMenuTimes[cat.id];
+        updateMenuSummary();
+      });
+      timeRow.appendChild(timeLabelText);
+      timeRow.appendChild(timeInput);
+      block.appendChild(timeRow);
+    }
 
     const chips = document.createElement("div");
     chips.className = "menu-category-chips";
@@ -1031,10 +1079,13 @@ function layoutMenuBody(doc, { draw, scale, margin, pageWidth, pageHeight, start
     if (!items.length) continue;
     anyItems = true;
 
+    const pickupTime = draftMenuTimes[cat.id];
+    const headingText = pickupTime ? `${cat.name}  —  Pickup: ${formatTime12Hour(pickupTime)}` : cat.name;
+
     ensureSpace(s.afterCategoryHeading + items.length * lineHeight);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(s.categorySize * scale);
-    if (draw) doc.text(cat.name, margin, y);
+    if (draw) doc.text(headingText, margin, y);
     y += s.afterCategoryHeading * scale;
 
     doc.setFont("helvetica", "normal");
@@ -1288,7 +1339,11 @@ async function generateMenuImage(ev, mode = "share") {
 
     const sections = MENU_CATEGORIES
       .filter((cat) => (draftMenu[cat.id] || []).length)
-      .map((cat) => ({ heading: cat.name, lines: draftMenu[cat.id] }));
+      .map((cat) => {
+        const pickupTime = draftMenuTimes[cat.id];
+        const heading = pickupTime ? `${cat.name} — Pickup: ${formatTime12Hour(pickupTime)}` : cat.name;
+        return { heading, lines: draftMenu[cat.id] };
+      });
     if (!sections.length) {
       sections.push({ heading: null, lines: ["No menu items added yet."] });
     }

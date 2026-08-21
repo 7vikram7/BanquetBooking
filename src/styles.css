@@ -513,6 +513,16 @@ input[type="number"]::-webkit-inner-spin-button {
 .menu-category-add-row input { flex: 1; }
 .menu-category-add-row .btn { flex: 0 0 auto; min-width: 2.6rem; }
 
+.menu-pickup-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.menu-pickup-time-row input[type="time"] { padding: 0.3rem 0.5rem; width: auto; }
+
 /* =======================================================================
    Share-card image (bookings-ui.js's buildShareCardImage()) — an
    off-screen, print-styled rendering of the Booking Confirmation/Menu/
