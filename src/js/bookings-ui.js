@@ -24,6 +24,8 @@ function initBookingModal() {
     document.getElementById(id).addEventListener("input", updateBalanceDisplay);
   });
 
+  initMenuPickupTimeFields();
+
   document.getElementById("bk-edit-menu-btn").addEventListener("click", openMenuModal);
   document.getElementById("bk-download-menu-btn").addEventListener("click", generateMenuPdf);
   document.getElementById("bk-share-menu-btn").addEventListener("click", (ev) => generateMenuPdf(ev, "share"));
@@ -60,16 +62,90 @@ let draftMenu = {}; // { [categoryId]: string[] }
 // Pickup times for the two categories that actually need a serving-time
 // coordination point (starters/main course are typically staggered during
 // service; the others aren't) — { starters: "HH:MM", mainCourse: "HH:MM" },
-// 24-hour string straight from <input type="time">'s own .value. Only
-// ever formatted to 12-hour AM/PM at DISPLAY time (formatTime12Hour() in
-// core.js), never stored that way — storing the raw 24-hour value keeps
-// it trivially re-editable in the same <input type="time">.
+// always stored as a 24-hour string (simplest single representation to
+// convert to/from). Entry and display, though, are both deliberately
+// 12-hour AM/PM everywhere a person actually sees this — see
+// MENU_PICKUP_TIME_FIELDS/to24Hour()/from24Hour() below for entry, and
+// formatTime12Hour() (core.js) for display in the summary/PDF/image.
+// Lives on the main booking modal (below Extra amount/Reason), NOT inside
+// the separate menu-editor modal — deliberately: this is a scheduling
+// detail for the event as a whole, not a menu-content edit, so it doesn't
+// belong behind the extra "Edit Menu" tap.
 let draftMenuTimes = {};
-// Only these two categories get a pickup-time input — starters and main
-// course are the ones actually staggered during service; a fixed list
-// rather than every category having one, since most (soup, salad, dal,
-// dessert, etc.) don't need this at all and it would just be UI noise.
-const MENU_PICKUP_TIME_CATEGORIES = ["starters", "mainCourse"];
+
+// Native <input type="time"> was tried first and rejected: its OWN picker
+// UI follows the browser/OS locale, which on a fair number of real
+// Windows/Chrome setups is 24-hour — no way to force AM/PM there from a
+// plain web page. Explicit hour(1-12)/minute/AM-PM <select>s instead
+// guarantee the INPUT itself reads 12-hour on every device, not just the
+// text this app later prints/displays from it.
+const MENU_PICKUP_TIME_FIELDS = [
+  { catId: "starters", hourId: "bk-starters-time-hour", minuteId: "bk-starters-time-minute", periodId: "bk-starters-time-period" },
+  { catId: "mainCourse", hourId: "bk-maincourse-time-hour", minuteId: "bk-maincourse-time-minute", periodId: "bk-maincourse-time-period" },
+];
+
+function to24Hour(hour12Str, minuteStr, period) {
+  let h = Number(hour12Str) % 12;
+  if (period === "PM") h += 12;
+  return `${String(h).padStart(2, "0")}:${minuteStr}`;
+}
+
+// Inverse of to24Hour() — null when unset, so callers can tell "blank the
+// selects" apart from "a real midnight/noon value".
+function from24Hour(hhmm) {
+  if (!hhmm) return null;
+  const [hStr, mStr] = hhmm.split(":");
+  let h = Number(hStr);
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  // Snaps to the nearest 5-minute option this UI actually offers — only
+  // matters for a value that somehow got set some other way with a
+  // non-5-multiple minute; normal use through this UI never produces one.
+  const minute = String(Math.floor(Number(mStr) / 5) * 5).padStart(2, "0");
+  return { hour12: String(h), minute, period };
+}
+
+function initMenuPickupTimeFields() {
+  const hourOptions = Array.from({ length: 12 }, (_, i) => ({ id: String(i + 1), name: String(i + 1) }));
+  const minuteOptions = Array.from({ length: 12 }, (_, i) => {
+    const m = String(i * 5).padStart(2, "0");
+    return { id: m, name: m };
+  });
+
+  for (const field of MENU_PICKUP_TIME_FIELDS) {
+    populateSelect(document.getElementById(field.hourId), hourOptions, { includeBlank: true, blankLabel: "—" });
+    populateSelect(document.getElementById(field.minuteId), minuteOptions);
+
+    const onChange = () => {
+      const hourVal = document.getElementById(field.hourId).value;
+      if (!hourVal) {
+        delete draftMenuTimes[field.catId];
+      } else {
+        const minuteVal = document.getElementById(field.minuteId).value;
+        const periodVal = document.getElementById(field.periodId).value;
+        draftMenuTimes[field.catId] = to24Hour(hourVal, minuteVal, periodVal);
+      }
+      updateMenuSummary();
+    };
+    document.getElementById(field.hourId).addEventListener("change", onChange);
+    document.getElementById(field.minuteId).addEventListener("change", onChange);
+    document.getElementById(field.periodId).addEventListener("change", onChange);
+  }
+}
+
+// Pre-fills (or blanks) the selects from draftMenuTimes — called from
+// openBookingModal() every time it opens, same as renderDraftPayments()
+// etc., since a fresh booking vs. an existing one with saved times need
+// different starting states.
+function renderMenuPickupTimeInputs() {
+  for (const field of MENU_PICKUP_TIME_FIELDS) {
+    const parsed = from24Hour(draftMenuTimes[field.catId]);
+    document.getElementById(field.hourId).value = parsed ? parsed.hour12 : "";
+    document.getElementById(field.minuteId).value = parsed ? parsed.minute : "00";
+    document.getElementById(field.periodId).value = parsed ? parsed.period : "AM";
+  }
+}
 let draftSettlement = null; // null until "Confirm Settlement" is clicked
 // Whether this booking already had a saved, persisted settlement when the
 // modal was opened — fixed for the life of this modal session, unlike
@@ -240,6 +316,7 @@ function openBookingModal(booking, prefill) {
   document.getElementById("bk-settlement-confirm-btn").classList.toggle("hidden", settlementLocked);
 
   renderDraftPayments();
+  renderMenuPickupTimeInputs();
   updateMenuSummary();
   updateSettlementSummary();
 
@@ -738,9 +815,9 @@ async function deleteBookingHandler() {
 // ---------------------------------------------------------------------------
 
 function menuPickupTimesSummary() {
-  const parts = MENU_PICKUP_TIME_CATEGORIES
-    .filter((id) => draftMenuTimes[id])
-    .map((id) => `${MENU_CATEGORIES.find((c) => c.id === id).name} at ${formatTime12Hour(draftMenuTimes[id])}`);
+  const parts = MENU_PICKUP_TIME_FIELDS
+    .filter((field) => draftMenuTimes[field.catId])
+    .map((field) => `${MENU_CATEGORIES.find((c) => c.id === field.catId).name} at ${formatTime12Hour(draftMenuTimes[field.catId])}`);
   return parts.join(" · ");
 }
 
@@ -780,30 +857,6 @@ function renderMenuCategories() {
     header.className = "menu-category-header";
     header.textContent = cat.name;
     block.appendChild(header);
-
-    if (MENU_PICKUP_TIME_CATEGORIES.includes(cat.id)) {
-      const timeRow = document.createElement("label");
-      timeRow.className = "menu-pickup-time-row";
-      const timeLabelText = document.createElement("span");
-      timeLabelText.textContent = "Pickup time";
-      const timeInput = document.createElement("input");
-      timeInput.type = "time";
-      // The native picker's own display format follows the browser/OS
-      // locale (could be 24-hour there) — that's fine, it's just an entry
-      // widget. Every place this is actually SHOWN to someone (this
-      // summary line, the PDF, the shareable image) goes through
-      // formatTime12Hour() instead, which is what actually guarantees
-      // 12-hour AM/PM consistently, independent of that.
-      timeInput.value = draftMenuTimes[cat.id] || "";
-      timeInput.addEventListener("change", () => {
-        if (timeInput.value) draftMenuTimes[cat.id] = timeInput.value;
-        else delete draftMenuTimes[cat.id];
-        updateMenuSummary();
-      });
-      timeRow.appendChild(timeLabelText);
-      timeRow.appendChild(timeInput);
-      block.appendChild(timeRow);
-    }
 
     const chips = document.createElement("div");
     chips.className = "menu-category-chips";
@@ -1073,19 +1126,32 @@ function layoutMenuBody(doc, { draw, scale, margin, pageWidth, pageHeight, start
     }
   }
 
+  // Pickup times print ONCE, above the whole category list — not
+  // per-category — since they're a scheduling detail for the event as a
+  // whole (when service starts for each), not a property of the dish
+  // list itself. Always 12-hour AM/PM via formatTime12Hour(), regardless
+  // of what locale the entry selects happened to render in.
+  const pickupParts = MENU_PICKUP_TIME_FIELDS
+    .filter((field) => draftMenuTimes[field.catId])
+    .map((field) => `${MENU_CATEGORIES.find((c) => c.id === field.catId).name}: ${formatTime12Hour(draftMenuTimes[field.catId])}`);
+  if (pickupParts.length) {
+    ensureSpace(s.afterCategoryHeading);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(s.categorySize * scale);
+    if (draw) doc.text(`Pickup Time  —  ${pickupParts.join("   ·   ")}`, margin, y);
+    y += (s.afterCategoryHeading + s.categoryGap) * scale;
+  }
+
   let anyItems = false;
   for (const cat of MENU_CATEGORIES) {
     const items = draftMenu[cat.id] || [];
     if (!items.length) continue;
     anyItems = true;
 
-    const pickupTime = draftMenuTimes[cat.id];
-    const headingText = pickupTime ? `${cat.name}  —  Pickup: ${formatTime12Hour(pickupTime)}` : cat.name;
-
     ensureSpace(s.afterCategoryHeading + items.length * lineHeight);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(s.categorySize * scale);
-    if (draw) doc.text(headingText, margin, y);
+    if (draw) doc.text(cat.name, margin, y);
     y += s.afterCategoryHeading * scale;
 
     doc.setFont("helvetica", "normal");
@@ -1337,13 +1403,20 @@ async function generateMenuImage(ev, mode = "share") {
     const dateVal = document.getElementById("bk-date").value;
     const notesVal = document.getElementById("bk-notes").value.trim();
 
-    const sections = MENU_CATEGORIES
-      .filter((cat) => (draftMenu[cat.id] || []).length)
-      .map((cat) => {
-        const pickupTime = draftMenuTimes[cat.id];
-        const heading = pickupTime ? `${cat.name} — Pickup: ${formatTime12Hour(pickupTime)}` : cat.name;
-        return { heading, lines: draftMenu[cat.id] };
-      });
+    // Pickup times print ONCE, at the top — same reasoning as
+    // layoutMenuBody()'s identical block for the PDF version: a
+    // scheduling detail for the event as a whole, not a per-category
+    // property, so it isn't attached to any one category's heading.
+    const pickupLines = MENU_PICKUP_TIME_FIELDS
+      .filter((field) => draftMenuTimes[field.catId])
+      .map((field) => `${MENU_CATEGORIES.find((c) => c.id === field.catId).name}: ${formatTime12Hour(draftMenuTimes[field.catId])}`);
+
+    const sections = [
+      ...(pickupLines.length ? [{ heading: "Pickup Time", lines: pickupLines }] : []),
+      ...MENU_CATEGORIES
+        .filter((cat) => (draftMenu[cat.id] || []).length)
+        .map((cat) => ({ heading: cat.name, lines: draftMenu[cat.id] })),
+    ];
     if (!sections.length) {
       sections.push({ heading: null, lines: ["No menu items added yet."] });
     }

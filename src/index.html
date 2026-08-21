@@ -352,6 +352,30 @@
       <label>Extra amount <input type="number" id="bk-extra-amount" min="0" placeholder="If applicable" /></label>
       <label>Reason for extra amount <input type="text" id="bk-extra-amount-reason" placeholder="e.g. Decoration, DJ" /></label>
     </div>
+    <div class="menu-pickup-time-block">
+      <label class="menu-pickup-time-field">
+        <span>Starters pickup time</span>
+        <span class="menu-pickup-time-inputs">
+          <select id="bk-starters-time-hour"></select>
+          <select id="bk-starters-time-minute"></select>
+          <select id="bk-starters-time-period">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </span>
+      </label>
+      <label class="menu-pickup-time-field">
+        <span>Main Course pickup time</span>
+        <span class="menu-pickup-time-inputs">
+          <select id="bk-maincourse-time-hour"></select>
+          <select id="bk-maincourse-time-minute"></select>
+          <select id="bk-maincourse-time-period">
+            <option value="AM">AM</option>
+            <option value="PM">PM</option>
+          </select>
+        </span>
+      </label>
+    </div>
     <p class="balance-line">Total amount: <strong id="bk-total-display">₹0</strong></p>
     <p class="muted" id="bk-menu-summary">No menu items yet.</p>
     <div class="modal-actions">

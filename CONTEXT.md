@@ -198,34 +198,53 @@ exits early once it fits) for the same robustness reason — a single
 linear correction is exact only when nothing wraps (e.g. long notes text
 re-wrapping at a different scale is not perfectly linear).
 
-## Menu editor: Starters/Main Course pickup times, always 12-hour
+## Starters/Main Course pickup time — main booking modal, always 12-hour
 
-Only `starters`/`mainCourse` (`MENU_PICKUP_TIME_CATEGORIES` in
-`bookings-ui.js`) get a `<input type="time">` "Pickup time" field in the
-menu editor — the two categories actually staggered during real service;
-the other ten don't need one and it would just be UI noise. Stored as
-`draftMenuTimes = { starters: "HH:MM", mainCourse: "HH:MM" }` (same
-draft-until-Save/Done pattern as `draftMenu`/`draftPayments` — reset from
-`booking?.menuPickupTimes` in `openBookingModal()`, persisted onto the
-record as `menuPickupTimes` in `readBookingForm()`), and shown wherever
-the menu itself is shown: the on-screen `#bk-menu-summary` line, the Menu
-PDF (`layoutMenuBody()` appends it to the category heading text, e.g.
-"Starters — Pickup: 7:30 PM"), and the Menu share-image
-(`generateMenuImage()`'s section heading, same format).
+Lives on the **main booking modal**, in the Menu section's pricing block
+— right after "Reason for extra amount", before "Total amount"
+(`.menu-pickup-time-block` in `index.html`) — NOT inside the separate
+menu-editor modal (`modal-menu`). First version put it in the menu
+editor (one `<input type="time">` injected into each of the Starters/
+Main Course category blocks in `renderMenuCategories()`); moved out
+because a pickup time is a scheduling detail for the event as a whole,
+not something that belongs behind the extra "Edit Menu" tap — this was
+an explicit correction, not a refinement.
 
-**Always 12-hour, "for all venues," regardless of what the native time
-picker's own UI shows.** `<input type="time">`'s `.value` is always
-24-hour zero-padded `"HH:MM"` per the HTML spec — that's stored as-is
-(keeps it trivially re-editable in the same input type), but every place
-it's actually DISPLAYED goes through a new `formatTime12Hour()` (`core.js`):
-manual string parsing (split on `:`, `% 12` with a `0 → 12` fixup for
-midnight/noon), deliberately NOT `toLocaleTimeString()` — that would
-follow the browser/OS locale, which is exactly the inconsistency "12-hour
-for all venues" was asked to rule out. The picker's own on-screen widget
-may still render 24-hour depending on the visiting browser/OS locale
-(nothing in a web page can override that natively) — only the app's own
-rendered text (summary/PDF/image) is guaranteed 12-hour, which is what's
-actually shared with anyone outside the app.
+**Two explicit hour(1-12)/minute/AM-PM `<select>`s per field, NOT
+`<input type="time">`.** The native time input was tried first and
+rejected for the same reason as the placement: its own picker UI follows
+the browser/OS locale, which on a real Windows/Chrome setup can render
+24-hour with no way for a web page to force AM/PM there — so "make sure
+it's 12-hour, not 24-hour" wasn't actually satisfiable with that element,
+only with the app's own *output* text. `MENU_PICKUP_TIME_FIELDS`
+(`bookings-ui.js`) drives both the hour/minute `<select>` population
+(`populateSelect()`, hours 1-12 with a blank "—" first option meaning
+"not set", minutes in 5-minute steps 00-55) and each field's 3 element
+ids. `to24Hour(hour12, minute, period)`/`from24Hour(hhmm)` convert
+between that 3-select representation and a single stored 24-hour
+`"HH:MM"` string (`draftMenuTimes = { starters, mainCourse }` — kept as
+24-hour internally purely because it's the simplest single
+representation to round-trip; entry and display are still both
+guaranteed 12-hour). Same draft-until-Save pattern as
+`draftMenu`/`draftPayments`: reset from `booking?.menuPickupTimes` in
+`openBookingModal()` (via `renderMenuPickupTimeInputs()`, pre-filling or
+blanking all 6 selects), persisted onto the record as `menuPickupTimes`
+in `readBookingForm()`.
+
+**Printed ONCE, at the top of the menu — not attached to each category's
+own heading.** First version appended the time directly onto e.g. the
+"Starters" heading text in both the PDF (`layoutMenuBody()`) and the
+share-image (`generateMenuImage()`); moved to a single combined line
+("Pickup Time — Starters: 7:30 PM · Main Course: 8:15 PM") printed
+before the category list in both, since — same reasoning as the UI
+placement — this is one scheduling fact about the event, not a property
+of any one category's dish list. `formatTime12Hour()` (`core.js`, manual
+string parsing — `split(":")`, `% 12` with a `0 → 12` fixup for midnight/
+noon — deliberately not `toLocaleTimeString()`, which would reintroduce
+the exact locale-dependent inconsistency this whole feature exists to
+rule out) is still what actually renders the stored 24-hour value as
+12-hour AM/PM everywhere it's shown: the on-screen `#bk-menu-summary`
+line, the PDF, and the share-image.
 
 ## Click-to-call and WhatsApp sharing
 

@@ -513,15 +513,23 @@ input[type="number"]::-webkit-inner-spin-button {
 .menu-category-add-row input { flex: 1; }
 .menu-category-add-row .btn { flex: 0 0 auto; min-width: 2.6rem; }
 
-.menu-pickup-time-row {
+/* Starters/Main Course pickup time — lives on the main booking modal
+   (below Extra amount/Reason), not inside the menu-editor modal.
+   Explicit hour/minute/AM-PM <select>s rather than <input type="time">
+   so the picker itself always reads 12-hour, not just the printed
+   output — see MENU_PICKUP_TIME_FIELDS in bookings-ui.js. */
+.menu-pickup-time-block {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-  font-size: 0.82rem;
-  color: var(--text-muted);
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 0.6rem 0 1rem;
 }
-.menu-pickup-time-row input[type="time"] { padding: 0.3rem 0.5rem; width: auto; }
+/* .menu-pickup-time-field is a real <label> — flex-column/gap/font-size/
+   color/margin-bottom already come from the global `label` rule above;
+   this just needs to not stretch to the block's full width. */
+.menu-pickup-time-field { flex: 0 0 auto; margin-bottom: 0; }
+.menu-pickup-time-inputs { display: flex; gap: 0.4rem; }
+.menu-pickup-time-inputs select { padding: 0.4rem 0.5rem; width: auto; }
 
 /* =======================================================================
    Share-card image (bookings-ui.js's buildShareCardImage()) — an
