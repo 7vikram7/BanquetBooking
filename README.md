@@ -114,11 +114,15 @@ preserved.
 firebase deploy --only hosting:<target> --project <projectId>
 ```
 
-Shree Krishna Palace's targets (`main`, `skpbanquet`) use whatever Google
-account is already interactively logged in via `firebase login`. Every
-other venue needs its own service-account credentials passed via env vars
-— see CONTEXT.md's "Deploy mechanics" for the exact isolated-`HOME`
-pattern and why it's necessary on Windows.
+Every venue, including Shree Krishna Palace, deploys via its own
+service-account credentials passed via env vars — see CONTEXT.md's
+"Deploy mechanics" for the exact isolated-`HOME` pattern and why it's
+necessary on Windows. Shree Krishna Palace originally relied on whatever
+Google account was interactively logged in via `firebase login`, but that
+cached session expired once in practice (blocking a deploy until someone
+re-ran `firebase login` by hand) — moved to a service account
+(`banquet-74423-service-account.json`) for the same reason every other
+venue already used one: it doesn't silently expire.
 
 `predeploy` mirrors `src/` into an isolated `public/` folder that Hosting
 actually serves (see `firebase.json`) — this keeps anything else in the

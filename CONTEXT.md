@@ -974,13 +974,13 @@ correct for `DEFAULT_SITE_KEY` (also what local dev/Playwright testing
 always sees, since `location.hostname` is `localhost` there).
 
 **Deploy mechanics — every venue's Google account is deliberately kept
-separate.** `pancharatnapimpri@gmail.com` (already `firebase login`'d
-interactively on this machine, long before this feature existed) has zero
-access to any other venue's project, and that's intentional — segregation
-is the whole point of a separate Google account per venue, so don't "fix"
-this by granting cross-account access. Instead, every venue *except*
-Shree Krishna Palace deploys via a **Google Cloud service account key**,
-scoped only to that one project, stored *outside* this repo entirely at
+separate.** `pancharatnapimpri@gmail.com` (Shree Krishna Palace's own
+Google account) has zero access to any other venue's project, and that's
+intentional — segregation is the whole point of a separate Google account
+per venue, so don't "fix" this by granting cross-account access. Every
+venue, Shree Krishna Palace included, deploys via a **Google Cloud
+service account key**, scoped only to that one project, stored *outside*
+this repo entirely at
 `C:\Users\akash\.banquet-credentials\<projectId>-service-account.json`
 (also `.gitignore`'d by pattern as defense-in-depth in case a key like
 this is ever dropped inside the repo — see git history, it's happened
@@ -990,6 +990,24 @@ sufficient to enable APIs or create the Firestore database (see below);
 discovered both times by hitting a real 403 on that specific step, not
 assumed upfront.
 
+**Shree Krishna Palace originally deployed via whatever Google account
+was already interactively logged in via `firebase login`** — the ORIGINAL
+venue, from before this multi-venue service-account pattern existed for
+the others. That cached CLI session expired in practice (cause never
+pinned down — could be inactivity, could be a `firebase logout`
+somewhere, could be Google's own session policy; firebase-tools doesn't
+surface a reason), which silently blocked a deploy until someone noticed
+and re-ran `firebase login` by hand, including the PowerShell
+`.ps1`-execution-policy gotcha below. Moved to the exact same
+service-account pattern as every other venue
+(`banquet-74423-service-account.json`, Owner role) specifically to remove
+this failure mode — a service account key doesn't expire the way an
+interactive OAuth session can, only if someone deliberately revokes it in
+IAM. **There is now no venue left that depends on an interactive
+`firebase login` session for its own deploys** — every command for every
+venue uses the isolated-`HOME` + `GOOGLE_APPLICATION_CREDENTIALS` pattern
+below.
+
 Using a service account requires bypassing firebase-tools' own cached CLI
 login, which otherwise silently wins over `GOOGLE_APPLICATION_CREDENTIALS`
 for every command (confirmed by testing with a deliberately broken
@@ -998,17 +1016,18 @@ even being consulted). firebase-tools resolves its "am I logged in"
 config via `os.homedir()`, which on native Windows Node.js reads the
 `USERPROFILE` environment variable — **not** Git Bash's `$HOME` (setting
 `$HOME` alone doesn't work; both look like they should matter but only
-`USERPROFILE` actually does). So every non-Shree-Krishna-Palace command
-needs both overridden together, pointed at an empty scratch directory so
-no cached login is found there:
+`USERPROFILE` actually does). So every venue's command needs both
+overridden together, pointed at an empty scratch directory so no cached
+login is found there:
 ```
 USERPROFILE="C:\\Temp\\isolated-home-<venue>" HOME=/tmp/isolated-home-<venue> \
 GOOGLE_APPLICATION_CREDENTIALS="C:\\Users\\akash\\.banquet-credentials\\<projectId>-service-account.json" \
 firebase <command> --project <projectId>
 ```
 (`onboard-venue.js`'s printed next-steps generate this exact command per
-venue.) Shree Krishna Palace commands need none of this — just run
-normally, using the already-cached `pancharatnapimpri@gmail.com` login.
+venue.) Shree Krishna Palace's own targets (`main`, `skpbanquet`) use
+`<projectId>` = `banquet-74423` here too, same as any other command
+targeting that project.
 
 **PowerShell-specific gotcha**: `firebase` itself is a `.ps1` script,
 which the default execution policy blocks from running at all
