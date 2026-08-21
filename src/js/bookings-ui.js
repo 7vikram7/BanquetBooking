@@ -27,6 +27,7 @@ function initBookingModal() {
   document.getElementById("bk-edit-menu-btn").addEventListener("click", openMenuModal);
   document.getElementById("bk-download-menu-btn").addEventListener("click", generateMenuPdf);
   document.getElementById("bk-share-menu-btn").addEventListener("click", (ev) => generateMenuPdf(ev, "share"));
+  document.getElementById("bk-share-menu-image-btn").addEventListener("click", generateMenuImage);
   // "Done" saves the booking outright (menu included) so the user never
   // has to separately click Save in the booking modal afterward — it
   // closes the menu editor first so any validation error from saveBooking()
@@ -38,6 +39,7 @@ function initBookingModal() {
   });
   document.getElementById("menu-download-pdf-btn").addEventListener("click", generateMenuPdf);
   document.getElementById("menu-share-pdf-btn").addEventListener("click", (ev) => generateMenuPdf(ev, "share"));
+  document.getElementById("menu-share-image-btn").addEventListener("click", generateMenuImage);
 
   // Deliberately no live-recompute on input here (unlike the pre-event
   // pricing fields above) — the final bill only appears once "Confirm" is
@@ -46,8 +48,10 @@ function initBookingModal() {
   document.getElementById("bk-settlement-confirm-btn").addEventListener("click", confirmSettlementHandler);
   document.getElementById("bk-event-summary-btn").addEventListener("click", generateEventSummaryPdf);
   document.getElementById("bk-event-summary-share-btn").addEventListener("click", (ev) => generateEventSummaryPdf(ev, "share"));
+  document.getElementById("bk-event-summary-image-share-btn").addEventListener("click", generateEventSummaryImage);
   document.getElementById("bk-confirmation-btn").addEventListener("click", generateBookingConfirmationPdf);
   document.getElementById("bk-confirmation-share-btn").addEventListener("click", (ev) => generateBookingConfirmationPdf(ev, "share"));
+  document.getElementById("bk-confirmation-image-share-btn").addEventListener("click", generateBookingConfirmationImage);
 }
 
 let editingBookingId = null;
@@ -237,6 +241,7 @@ function openBookingModal(booking, prefill) {
   const confirmationAvailable = isEdit && booking?.status === "confirmed";
   document.getElementById("bk-confirmation-btn").classList.toggle("hidden", !confirmationAvailable);
   document.getElementById("bk-confirmation-share-btn").classList.toggle("hidden", !confirmationAvailable);
+  document.getElementById("bk-confirmation-image-share-btn").classList.toggle("hidden", !confirmationAvailable);
 
   openModal("modal-booking");
 }
@@ -468,6 +473,7 @@ function updateSettlementSummary() {
   // anyone once settled, not gated by the owner-only edit lock.
   document.getElementById("bk-event-summary-btn").classList.toggle("hidden", !settled);
   document.getElementById("bk-event-summary-share-btn").classList.toggle("hidden", !settled);
+  document.getElementById("bk-event-summary-image-share-btn").classList.toggle("hidden", !settled);
   if (!settled) {
     summaryEl.textContent = settlementTooEarly()
       ? `Settlement can be recorded on or after the event day (${formatDateHuman(document.getElementById("bk-date").value)}).`
@@ -658,6 +664,7 @@ async function performSaveBooking() {
   const stillConfirmed = savedBooking.status === "confirmed";
   document.getElementById("bk-confirmation-btn").classList.toggle("hidden", !stillConfirmed);
   document.getElementById("bk-confirmation-share-btn").classList.toggle("hidden", !stillConfirmed);
+  document.getElementById("bk-confirmation-image-share-btn").classList.toggle("hidden", !stillConfirmed);
   await refreshCurrentTab();
   return true;
 }
@@ -726,6 +733,7 @@ function updateMenuSummary() {
   // once there's actually a menu to view/download.
   document.getElementById("bk-download-menu-btn").classList.toggle("hidden", totalItems === 0);
   document.getElementById("bk-share-menu-btn").classList.toggle("hidden", totalItems === 0);
+  document.getElementById("bk-share-menu-image-btn").classList.toggle("hidden", totalItems === 0);
 }
 
 // All 12 categories are listed at once, each with its own input — clicking
@@ -1070,31 +1078,295 @@ function layoutMenuBody(doc, { draw, scale, margin, pageWidth, pageHeight, start
   return { finalY: y, heightUsed: y - startY, overflowed };
 }
 
-// Shared "what happens to a finished PDF" step for all three PDF types —
-// either the normal browser download (doc.save()), or handed to the OS
-// share sheet via the Web Share API's file support so the user can pick
-// WhatsApp (or anything else) from it. There's no way to attach an
+// Shared "what happens to a finished file" step for every generated
+// PDF/image in this file — either a normal browser download, or handed to
+// the OS share sheet via the Web Share API's file support so the user can
+// pick WhatsApp (or anything else) from it. There's no way to attach an
 // arbitrary file to a WhatsApp message from a plain web page without that
 // OS-level share support — wa.me links only prefill TEXT, never a file —
 // so browsers without it (most desktop browsers today) fall back to a
-// plain download plus a nudge to attach it manually.
-async function outputPdf(doc, filename, mode) {
-  if (mode !== "share") {
-    doc.save(filename);
-    return;
-  }
-  const file = new File([doc.output("blob")], filename, { type: "application/pdf" });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+// plain download plus a nudge to attach it manually. Used identically by
+// the PDF generators (via outputPdf() below) and the newer image
+// generators (buildShareCardImage()) — the file's content type is the
+// only thing that differs between them.
+async function shareOrDownloadFile(file, mode) {
+  if (mode === "share" && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: filename });
+      await navigator.share({ files: [file], title: file.name });
       return;
     } catch (err) {
       if (err?.name === "AbortError") return; // user cancelled the share sheet — not a failure
       console.warn("[share] navigator.share failed, falling back to download", err);
     }
   }
-  doc.save(filename);
-  alert("Your browser can't share files directly here. The PDF has been downloaded instead — attach it to WhatsApp manually.");
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(url);
+  if (mode === "share") {
+    const kind = file.type === "application/pdf" ? "PDF" : "image";
+    alert(`Your browser can't share files directly here. The ${kind} has been downloaded instead — attach it to WhatsApp manually.`);
+  }
+}
+
+async function outputPdf(doc, filename, mode) {
+  const file = new File([doc.output("blob")], filename, { type: "application/pdf" });
+  await shareOrDownloadFile(file, mode);
+}
+
+// ---------------------------------------------------------------------------
+// Share-as-image — a second, independent renderer for the same three
+// documents (Booking Confirmation/Menu/Event Summary), producing a PNG
+// instead of a PDF. Deliberately NOT derived from the jsPDF drawing code
+// above: that layout logic carries real earned complexity (auto-shrink-
+// to-fit, multi-page overflow, see MENU_PDF_MIN_SCALE/ensureSpace) that a
+// shareable image doesn't need — real HTML/CSS laid out by the browser
+// and rasterized via html2canvas handles a variable-length menu or a long
+// notes field for free, no manual measuring pass required. Each generator
+// below (generate*Image()) reads the exact same live form fields/booking
+// data its *Pdf() sibling does, just formatted into { heading, lines }
+// sections instead of doc.text() calls.
+// ---------------------------------------------------------------------------
+
+// Real ₹ renders fine here (unlike formatMoneyForPdf's "Rs." workaround)
+// since this is actual browser text with a real font, not a PDF standard
+// font with no rupee glyph.
+function shareCardSectionHtml(section) {
+  const lines = section.lines
+    .map((line) => {
+      if (typeof line === "string") {
+        return `<div class="share-card-line">${escapeHtml(line)}</div>`;
+      }
+      return `
+        <div class="share-card-row${line.bold ? " share-card-row-bold" : ""}">
+          <span>${escapeHtml(line.left)}</span>
+          <span>${escapeHtml(line.right)}</span>
+        </div>
+      `;
+    })
+    .join("");
+  return `
+    <div class="share-card-section">
+      ${section.heading ? `<h3>${escapeHtml(section.heading)}</h3>` : ""}
+      ${lines}
+    </div>
+  `;
+}
+
+// title/detailLines/sections together are the whole card — detailLines is
+// the same two-line "Customer: X · Date: Y · Venue: Z" / "Event type: ·
+// Guest count:" format drawPdfHeader() already uses for the PDFs, passed
+// in rather than recomputed here so both stay in sync automatically.
+async function buildShareCardHtml(title, detailLines, sections) {
+  let logoImgHtml = "";
+  try {
+    const logoDataUrl = await imageUrlToDataUrl(SITE.logo);
+    logoImgHtml = `<img src="${logoDataUrl}" class="share-card-logo" />`;
+  } catch (err) {
+    // No logo file for this venue yet — same graceful degradation as
+    // drawPdfHeader()'s identical fallback for the PDF versions.
+  }
+  return `
+    <div class="share-card">
+      <div class="share-card-header">
+        ${logoImgHtml}
+        <div>
+          <div class="share-card-venue">${escapeHtml(SITE.name)}</div>
+          <div class="share-card-title">${escapeHtml(title)}</div>
+          <div class="share-card-detail">${detailLines.map((l) => escapeHtml(l)).join("<br>")}</div>
+        </div>
+      </div>
+      ${sections.map(shareCardSectionHtml).join("")}
+    </div>
+  `;
+}
+
+// Renders the given HTML into an off-screen (not display:none —
+// html2canvas needs real layout) container and rasterizes it to a PNG
+// File. scale:2 for a crisp image on the high-DPI phone screens these are
+// actually viewed on, being a WhatsApp attachment.
+async function renderShareCardToFile(html, filename) {
+  await loadHtml2Canvas();
+  const container = document.createElement("div");
+  container.className = "share-card-offscreen";
+  container.innerHTML = html;
+  document.body.appendChild(container);
+  try {
+    const canvas = await window.html2canvas(container.firstElementChild, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+    });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    return new File([blob], filename, { type: "image/png" });
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+function shareCardDetailLines() {
+  const halls = window.appSettings.halls;
+  const customer = document.getElementById("bk-customer").value.trim() || "Guest";
+  const dateVal = document.getElementById("bk-date").value;
+  const hallId = document.getElementById("bk-hall").value;
+  const slotId = document.getElementById("bk-slot").value;
+  const eventType = document.getElementById("bk-event-type").value;
+  const guests = document.getElementById("bk-guests").value;
+  return [
+    `Customer: ${customer} · Date: ${dateVal ? formatDateHuman(dateVal) : "—"} · Venue: ${hallName(halls, hallId)} — ${slotName(slotId)}`,
+    `Event type: ${eventType || "—"} · Guest count: ${guests || "—"}`,
+  ];
+}
+
+async function generateBookingConfirmationImage(ev, mode = "share") {
+  const btn = ev?.currentTarget || document.getElementById("bk-confirmation-image-share-btn");
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Preparing image…";
+
+  try {
+    const customer = document.getElementById("bk-customer").value.trim() || "Guest";
+    const dateVal = document.getElementById("bk-date").value;
+    const phone = document.getElementById("bk-phone").value.trim();
+    const email = document.getElementById("bk-email").value.trim();
+    const perPlateCost = toNumber(document.getElementById("bk-per-plate-cost").value);
+    const hallRent = toNumber(document.getElementById("bk-hall-rent").value);
+    const extraAmount = toNumber(document.getElementById("bk-extra-amount").value);
+    const extraReason = document.getElementById("bk-extra-amount-reason").value.trim();
+    const total = computeBookingTotal();
+    const advance = draftPayments.reduce((s, p) => s + toNumber(p.amount), 0);
+    const notesVal = document.getElementById("bk-notes").value.trim();
+
+    const detailsLines = [
+      { left: "Phone", right: phone || "—" },
+      ...(email ? [{ left: "Email", right: email }] : []),
+      { left: "Rate (per plate)", right: formatMoney(perPlateCost) },
+      ...(hallRent > 0 ? [{ left: "Hall rent", right: formatMoney(hallRent) }] : []),
+      ...(extraAmount > 0 ? [{ left: "Extra amount", right: formatMoney(extraAmount) + (extraReason ? ` (${extraReason})` : "") }] : []),
+      { left: "Total amount", right: formatMoney(total), bold: true },
+    ];
+
+    const advanceLines = draftPayments.length
+      ? [
+          ...draftPayments.map((p) => `${formatMoney(p.amount)} — received by ${p.receivedBy || "—"} on ${formatDateDDMMYYYY(p.date)}`),
+          { left: "Total advance received", right: formatMoney(advance), bold: true },
+        ]
+      : [`Advance received: ${formatMoney(0)}`];
+
+    const sections = [
+      { heading: "Booking Details", lines: detailsLines },
+      { heading: "Advance Received", lines: advanceLines },
+      { heading: null, lines: [{ left: "Balance due", right: formatMoney(total - advance), bold: true }] },
+      ...(notesVal ? [{ heading: "Notes", lines: [notesVal] }] : []),
+    ];
+
+    const html = await buildShareCardHtml("Booking Confirmation", shareCardDetailLines(), sections);
+    const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
+    const file = await renderShareCardToFile(html, `Booking Confirmation - ${filenameSafe} - ${dateVal || "undated"}.png`);
+    await shareOrDownloadFile(file, mode);
+  } catch (err) {
+    console.error("[booking-confirmation-image] failed to generate image", err);
+    alert("Could not generate the image — check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
+}
+
+async function generateMenuImage(ev, mode = "share") {
+  const btn = ev?.currentTarget || document.getElementById("bk-share-menu-image-btn");
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Preparing image…";
+
+  try {
+    const customer = document.getElementById("bk-customer").value.trim() || "Guest";
+    const dateVal = document.getElementById("bk-date").value;
+    const notesVal = document.getElementById("bk-notes").value.trim();
+
+    const sections = MENU_CATEGORIES
+      .filter((cat) => (draftMenu[cat.id] || []).length)
+      .map((cat) => ({ heading: cat.name, lines: draftMenu[cat.id] }));
+    if (!sections.length) {
+      sections.push({ heading: null, lines: ["No menu items added yet."] });
+    }
+    if (notesVal) sections.push({ heading: "Notes", lines: [notesVal] });
+
+    const html = await buildShareCardHtml("Event Menu", shareCardDetailLines(), sections);
+    const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
+    const file = await renderShareCardToFile(html, `Menu - ${filenameSafe} - ${dateVal || "undated"}.png`);
+    await shareOrDownloadFile(file, mode);
+  } catch (err) {
+    console.error("[menu-image] failed to generate image", err);
+    alert("Could not generate the image — check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
+}
+
+async function generateEventSummaryImage(ev, mode = "share") {
+  const btn = ev?.currentTarget || document.getElementById("bk-event-summary-image-share-btn");
+  const originalLabel = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = "Preparing image…";
+
+  try {
+    const customer = document.getElementById("bk-customer").value.trim() || "Guest";
+    const dateVal = document.getElementById("bk-date").value;
+    const notesVal = document.getElementById("bk-notes").value.trim();
+    const s = draftSettlement;
+
+    const settlementLines = s
+      ? [
+          { left: "Final plate count", right: String(s.finalPlateCount || 0) },
+          { left: "Per plate cost", right: formatMoney(s.finalPerPlateCost || 0) },
+          { left: "Hall rent", right: formatMoney(s.finalHallRent || 0) },
+          { left: "Extra amount", right: formatMoney(s.finalExtraAmount || 0) + (s.finalExtraReason ? ` (${s.finalExtraReason})` : "") },
+          { left: "Subtotal", right: formatMoney(s.subtotal ?? s.finalTotalAmount ?? 0) },
+          ...(s.gstApplied ? [{ left: "GST (5%)", right: formatMoney(s.gstAmount || 0) }] : []),
+          { left: "Final total", right: formatMoney(s.finalTotalAmount || 0), bold: true },
+          `Settled by ${s.settledBy} on ${formatDateHuman(s.settledDate)}`,
+        ]
+      : ["Not settled yet."];
+
+    const advanceLines = draftPayments.length
+      ? draftPayments
+          .slice()
+          .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+          .map((p) => `${formatDateHuman(p.date)} · ${formatMoney(p.amount)} · ${p.mode || ""} · by ${p.receivedBy || "—"}`)
+      : ["No advances recorded."];
+
+    const advance = bookingPaid({ payments: draftPayments });
+    const collected = toNumber(draftSettlement?.collectedAmount);
+    const total = draftSettlement?.finalTotalAmount ?? computeBookingTotal();
+    const totalsLines = [
+      { left: "Total advances received", right: formatMoney(advance), bold: true },
+      ...(s ? [{ left: "Collected at settlement", right: formatMoney(collected) }] : []),
+      { left: "Total received", right: formatMoney(advance + collected), bold: true },
+      { left: "Balance due", right: formatMoney(total - advance - collected), bold: true },
+    ];
+
+    const sections = [
+      { heading: "Final Settlement", lines: settlementLines },
+      { heading: "Advances Received", lines: advanceLines },
+      { heading: null, lines: totalsLines },
+      ...(notesVal ? [{ heading: "Notes", lines: [notesVal] }] : []),
+    ];
+
+    const html = await buildShareCardHtml("Event Summary", shareCardDetailLines(), sections);
+    const filenameSafe = customer.replace(/[^a-z0-9]+/gi, "_");
+    const file = await renderShareCardToFile(html, `Event Summary - ${filenameSafe} - ${dateVal || "undated"}.png`);
+    await shareOrDownloadFile(file, mode);
+  } catch (err) {
+    console.error("[event-summary-image] failed to generate image", err);
+    alert("Could not generate the image — check your connection and try again.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalLabel;
+  }
 }
 
 async function generateMenuPdf(ev, mode = "download") {

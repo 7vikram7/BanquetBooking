@@ -514,6 +514,58 @@ input[type="number"]::-webkit-inner-spin-button {
 .menu-category-add-row .btn { flex: 0 0 auto; min-width: 2.6rem; }
 
 /* =======================================================================
+   Share-card image (bookings-ui.js's buildShareCardImage()) — an
+   off-screen, print-styled rendering of the Booking Confirmation/Menu/
+   Event Summary rasterized via html2canvas into a shareable PNG. Kept
+   OFF-SCREEN (not display:none — html2canvas needs real layout) rather
+   than inside a modal, so it never has to fight the app's own dark-mode/
+   theming; deliberately plain black-on-white regardless of the rest of
+   the app's palette, same as a printed page would be.
+   ======================================================================= */
+
+.share-card-offscreen {
+  position: fixed;
+  top: 0;
+  left: -9999px;
+  width: 480px;
+  background: #fff;
+}
+.share-card {
+  width: 480px;
+  padding: 24px;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  box-sizing: border-box;
+}
+.share-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--primary, #186860);
+  margin-bottom: 16px;
+}
+.share-card-logo { max-height: 56px; max-width: 140px; width: auto; height: auto; }
+.share-card-venue { font-size: 13px; font-weight: 600; color: var(--primary, #186860); text-transform: uppercase; letter-spacing: 0.04em; }
+.share-card-title { font-size: 19px; font-weight: 700; margin-top: 2px; }
+.share-card-detail { font-size: 13px; color: #555; margin-top: 4px; line-height: 1.4; }
+.share-card-section { margin-bottom: 16px; }
+.share-card-section h3 {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--primary, #186860);
+  margin: 0 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #e5e2d8;
+}
+.share-card-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 3px 0; }
+.share-card-row-bold { font-weight: 700; font-size: 15px; }
+.share-card-line { font-size: 14px; padding: 3px 0; }
+
+/* =======================================================================
    Mobile (phone) layout — most staff use this app on phones, so this is
    not a cosmetic afterthought. The calendar stays a real 7-column month
    grid (not an agenda list) — each day cell shrinks to fit, and its

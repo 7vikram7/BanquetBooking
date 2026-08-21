@@ -260,6 +260,48 @@ icon gone for good). Fixed by capturing/restoring via `innerHTML`
 instead — verified with a real generate-then-restore cycle confirming the
 icon's `<img>` survives byte-for-byte.
 
+**Share as Image, alongside the existing Share as PDF.** Every one of
+the three PDF share points got a second, sibling button — "Share Image
+via WhatsApp" — so a customer/kitchen-staff recipient without a PDF
+viewer handy still gets something legible straight in the chat, which is
+the more common real request for a WhatsApp share than a PDF attachment
+in the first place. Deliberately a SEPARATE renderer
+(`buildShareCardHtml()`/`generateBookingConfirmationImage()`/
+`generateMenuImage()`/`generateEventSummaryImage()`, all in
+`bookings-ui.js`) from the jsPDF one, not derived from it — the PDF
+layout code carries real earned complexity (auto-shrink-to-fit,
+multi-page overflow, see `MENU_PDF_MIN_SCALE`/`ensureSpace()`) that a
+shareable image doesn't need to replicate. Instead: build real HTML
+(`.share-card`/`.share-card-section`/`.share-card-row` in
+`styles.css` — a plain black-on-white "receipt card" using
+`var(--primary)` for accents, deliberately NOT themed per-venue beyond
+that, same as a printed page wouldn't be), render it off-screen
+(`.share-card-offscreen`: `position:fixed; left:-9999px`, NOT
+`display:none` — html2canvas needs real layout to rasterize), and
+rasterize via **html2canvas** (`loadHtml2Canvas()` in `core.js`, lazy
+CDN-loaded the same cdnjs-primary/jsdelivr-fallback way as
+jsPDF/SheetJS) at `scale:2` for a crisp result on the phone screens these
+are actually viewed on. Each `generate*Image()` reads the exact same
+live form fields/booking data its `*Pdf()` sibling does — just formatted
+into `{heading, lines}` sections instead of `doc.text()` calls — so the
+two never show conflicting figures. Real ₹ renders directly (unlike
+`formatMoneyForPdf()`'s "Rs." workaround for jsPDF's standard fonts,
+which have no rupee glyph) since this is genuine browser text with a
+real font.
+
+The resulting PNG flows through the exact same `shareOrDownloadFile()`
+dispatcher the PDFs use (renamed/generalized from the old PDF-only
+`outputPdf()`, which now just builds a `File` and delegates) — same
+Web-Share-API-with-download-fallback behavior, same visibility toggles
+as their PDF siblings (an image-share button is only shown wherever its
+PDF counterpart already was: confirmed booking, settled event, non-empty
+menu). Verified two ways: content correctness by faking
+`window.html2canvas` to capture the exact HTML it was asked to
+rasterize (checked all three cards' text against their PDF siblings'
+known-correct values from earlier commits), and the real rendering
+pipeline end to end with the actual CDN-loaded html2canvas library
+(confirmed a genuine, correctly-signed PNG comes out the other end).
+
 ## Summary tab — the one tab both owner and staff see
 
 `summary-ui.js`'s tab is deliberately the only one besides Calendar that

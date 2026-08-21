@@ -643,6 +643,39 @@ function loadXlsx() {
   return xlsxLoadPromise;
 }
 
+// ---------------------------------------------------------------------------
+// html2canvas — loaded lazily (only when a "Share Image" button is actually
+// clicked) for the booking-confirmation/menu/event-summary image-sharing
+// feature (bookings-ui.js's buildShareCardImage()). Same cdnjs-primary,
+// jsdelivr-fallback pattern as jsPDF/XLSX above.
+// ---------------------------------------------------------------------------
+
+const HTML2CANVAS_VERSION = "1.4.1";
+let html2CanvasLoadPromise = null;
+
+function loadHtml2Canvas() {
+  if (window.html2canvas) return Promise.resolve();
+  if (html2CanvasLoadPromise) return html2CanvasLoadPromise;
+
+  const sources = [
+    `https://cdnjs.cloudflare.com/ajax/libs/html2canvas/${HTML2CANVAS_VERSION}/html2canvas.min.js`,
+    `https://cdn.jsdelivr.net/npm/html2canvas@${HTML2CANVAS_VERSION}/dist/html2canvas.min.js`,
+  ];
+
+  html2CanvasLoadPromise = (async () => {
+    for (const src of sources) {
+      try {
+        await loadScript(src);
+        if (window.html2canvas) return;
+      } catch (err) {
+        console.warn("[core] html2canvas source failed, trying fallback…", err);
+      }
+    }
+    throw new Error("All html2canvas sources failed to load.");
+  })();
+  return html2CanvasLoadPromise;
+}
+
 // Fetches a same-origin image and resolves its contents as a data: URL, for
 // embedding into a generated PDF via doc.addImage().
 function imageUrlToDataUrl(url) {
